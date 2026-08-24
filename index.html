@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Архитектура Навыков | Анастасия Нигматуллина</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+        :root {
+            --bg-deep: #09040f;
+            --glass-bg: rgba(22, 11, 41, 0.4);
+            --glass-border: rgba(142, 68, 255, 0.2);
+            --neon-purple: #9d4edd;
+            --neon-cyan: #00f5ff;
+            --text-main: #f3e8ff;
+            --text-muted: #a694c4;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+            padding: 4rem 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Абстрактный фоновый шум и свечение */
+        .ambient-light {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(140px);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .light-1 {
+            top: -10%; left: -10%;
+            width: 50vw; height: 50vw;
+            background: rgba(157, 78, 221, 0.15);
+        }
+
+        .light-2 {
+            bottom: -20%; right: -10%;
+            width: 60vw; height: 60vw;
+            background: rgba(0, 245, 255, 0.08);
+        }
+
+        /* Заголовок */
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ffffff 0%, var(--neon-purple) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            font-weight: 300;
+            color: var(--text-muted);
+            max-width: 650px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* T-Shape Layout */
+        .t-architecture {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1200px;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Горизонталь (Сканнер) */
+        .horizontal-layer {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            margin-bottom: 2rem;
+        }
+
+        /* Карточки-Глассморфизм */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2rem;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--neon-purple), transparent);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(157, 78, 221, 0.5);
+            box-shadow: 0 10px 40px -10px rgba(157, 78, 221, 0.2);
+        }
+
+        .glass-card:hover::before {
+            opacity: 1;
+        }
+
+        .icon-wrapper {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            display: inline-block;
+            background: rgba(255,255,255,0.03);
+            padding: 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 1.2rem;
+            letter-spacing: -0.01em;
+        }
+
+        ul {
+            list-style: none;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        li {
+            margin-bottom: 0.8rem;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        li::before {
+            content: '✦';
+            position: absolute;
+            left: 0;
+            color: var(--neon-purple);
+            font-size: 0.8rem;
+            top: 2px;
+        }
+
+        /* Вертикаль (Глубина) */
+        .vertical-layer {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+        }
+
+        /* Соединительная линия T-Shape */
+        .vertical-layer::after {
+            content: '';
+            position: absolute;
+            top: -2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 2rem;
+            background: linear-gradient(to bottom, var(--neon-purple), transparent);
+            z-index: -1;
+        }
+
+        /* Ядро профиля */
+        .core-node {
+            background: linear-gradient(160deg, rgba(46, 20, 82, 0.6) 0%, rgba(22, 11, 41, 0.8) 100%);
+            border: 1px solid rgba(157, 78, 221, 0.4);
+            box-shadow: 0 0 30px rgba(157, 78, 221, 0.1);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-light light-1"></div>
+    <div class="ambient-light light-2"></div>
+
+    <header>
+        <h1>Анастасия Нигматуллина</h1>
+        <p class="subtitle">EdTech Архитектор & Педагогический дизайнер.<br>Превращаю хаос нейрофизиологии, кода и визуала <br>в эстетичные образовательные экосистемы.</p>
+    </header>
+
+    <div class="t-architecture">
+        
+        <!-- ГОРИЗОНТАЛЬ (Ширина охвата) -->
+        <div class="horizontal-layer">
+            <div class="glass-card">
+                <div class="icon-wrapper">🧠</div>
+                <h3>Нейро и Эмпатия</h3>
+                <ul>
+                    <li>Учитель начальных корр. классов</li>
+                    <li>Логопедия и дефектология (ЗПР, ТНР)</li>
+                    <li>Механика «Айсберга поведения»</li>
+                    <li>Снижение когнитивной нагрузки</li>
+                </ul>
+            </div>
+            <div class="glass-card">
+                <div class="icon-wrapper">💻</div>
+                <h3>Логика и Код</h3>
+                <ul>
+                    <li>Python, Flask, REST API</li>
+                    <li>Архитектура БД (SQLAlchemy)</li>
+                    <li>Prompt Engineering & ИИ-агенты</li>
+                    <li>Декомпозиция монолитных систем</li>
+                </ul>
+            </div>
+            <div class="glass-card">
+                <div class="icon-wrapper">🎨</div>
+                <h3>Дизайн и Эстетика</h3>
+                <ul>
+                    <li>Разработка TTF-шрифтов</li>
+                    <li>Figma, CorelDraw, UI/UX</li>
+                    <li>Упаковка смыслов в визуал</li>
+                    <li>Перфекционизм в типографике</li>
+                </ul>
+            </div>
+            <div class="glass-card">
+                <div class="icon-wrapper">🎭</div>
+                <h3>Сюжет и Внимание</h3>
+                <ul>
+                    <li>Геймификация и SMM-опыт</li>
+                    <li>Режиссура вовлеченности</li>
+                    <li>Сценарное проектирование</li>
+                    <li>Управление IT-сообществами</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ВЕРТИКАЛЬ (Глубокая экспертиза) -->
+        <div class="vertical-layer">
+            <div class="glass-card core-node">
+                <div class="icon-wrapper" style="color: var(--neon-cyan);">⚡</div>
+                <h3>Метапедагогика (Ядро)</h3>
+                <ul>
+                    <li>Перевод теории в цифровой опыт</li>
+                    <li>Инжиниринг пороговых концептов (Tricky Topics)</li>
+                    <li>Создание сред, а не конспектов</li>
+                </ul>
+            </div>
+            <div class="glass-card">
+                <div class="icon-wrapper" style="color: var(--neon-cyan);">🌌</div>
+                <h3>Иммерсивные миры</h3>
+                <ul>
+                  <li>Создание образовательных метавселенных</li>
+                    <li>Внедрение Roblox и Minecraft в обучение</li>
+                    <li>Web-квесты (Кибергерои против Хакера-Тени - Кибербезопасность)</li>
+                    <li>Телеграм-интерфейсы (Профессор Инновацио - обучающий квест по цифровым средам для педагогов)</li>
+                </ul>
+            </div>
+            <div class="glass-card">
+                <div class="icon-wrapper" style="color: var(--neon-cyan);">🏗</div>
+                <h3>Системная архитектура</h3>
+                <ul>
+                    <li>Сборка сложных платформ (ПедаДок)</li>
+                    <li>Сквозная интеграция ИИ в процесс</li>
+                    <li>Проектирование от мотивов ученика до архитектуры БД</li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
