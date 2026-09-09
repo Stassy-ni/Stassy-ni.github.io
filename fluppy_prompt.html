@@ -1,1 +1,718 @@
-V
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Собери свою игру</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg-0:#0a0e27;
+  --bg-1:#121a3d;
+  --panel:#151b3a;
+  --panel-2:#1b2350;
+  --line:#2a3468;
+  --text:#eef1ff;
+  --text-dim:#9aa3d1;
+  --amber:#ffb84d;
+  --cyan:#4fd6e8;
+  --magenta:#ff5fa8;
+  --green-ok:#5bd97a;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background: radial-gradient(1200px 800px at 20% -10%, #1c2560 0%, transparent 60%),
+              radial-gradient(1000px 700px at 100% 0%, #2a1450 0%, transparent 55%),
+              linear-gradient(180deg, var(--bg-0), var(--bg-1) 60%, #0a0e27);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+}
+
+.page{
+  max-width:1180px;
+  margin:0 auto;
+  padding:28px 18px 64px;
+}
+
+/* ---------- Header ---------- */
+.brand{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-family:'Orbitron',sans-serif;
+  font-size:11px;
+  letter-spacing:.14em;
+  color:var(--amber);
+  background:rgba(255,184,77,0.08);
+  border:1px solid rgba(255,184,77,0.35);
+  border-radius:999px;
+  padding:6px 14px;
+  margin-bottom:12px;
+}
+h1{
+  font-family:'Orbitron',sans-serif;
+  font-weight:800;
+  font-size:clamp(24px,4.5vw,34px);
+  margin:0 0 8px;
+  line-height:1.1;
+  background:linear-gradient(90deg,#fff,var(--cyan));
+  -webkit-background-clip:text;
+  background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
+.subtitle{
+  color:var(--text-dim);
+  font-size:14px;
+  line-height:1.5;
+  max-width:640px;
+  margin:0 0 18px;
+}
+
+/* ---------- Console / live preview ---------- */
+.console-wrap{
+  position:relative;
+  margin-bottom:22px;
+  border-radius:22px;
+  padding:12px;
+  background:linear-gradient(160deg,#20264f,#12163a);
+  border:1px solid var(--line);
+  box-shadow:0 20px 50px -20px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+.console-hud{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:2px 8px 8px;
+  font-family:'Orbitron',sans-serif;
+  font-size:11px;
+  letter-spacing:.12em;
+  color:var(--text-dim);
+}
+.console-hud .dot{
+  display:inline-block;
+  width:7px;height:7px;
+  border-radius:50%;
+  background:var(--green-ok);
+  margin-right:6px;
+  box-shadow:0 0 8px var(--green-ok);
+  animation:pulse 1.6s ease-in-out infinite;
+}
+.console-hud .score{color:var(--amber);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+.screen{
+  position:relative;
+  width:100%;
+  height:clamp(200px,26vw,290px);
+  border-radius:14px;
+  overflow:hidden;
+  background:#000;
+  border:2px solid #000;
+}
+.screen svg{width:100%;height:100%;display:block;}
+.screen::after{
+  content:'';
+  position:absolute;inset:0;
+  background:repeating-linear-gradient(180deg, rgba(0,0,0,0.12) 0px, rgba(0,0,0,0.12) 1px, transparent 1px, transparent 3px);
+  pointer-events:none;
+  mix-blend-mode:overlay;
+  opacity:.5;
+}
+
+/* SVG decorations */
+.cloud{animation:sway 6s ease-in-out infinite alternate;}
+.cloud2{animation-duration:7.5s; animation-delay:-1s;}
+.cloud3{animation-duration:5.2s; animation-delay:-2.4s;}
+@keyframes sway{from{transform:translateX(-10px);}to{transform:translateX(10px);}}
+
+.star{animation:twinkle 2.4s ease-in-out infinite;}
+@keyframes twinkle{0%,100%{opacity:.25;}50%{opacity:1;}}
+
+.window{animation:flicker 3.6s ease-in-out infinite;}
+@keyframes flicker{0%,42%,100%{opacity:1;}46%,54%{opacity:.35;}}
+
+#character{animation:bob 1.5s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(-9px);}}
+
+#obstaclePair{animation:swayObs 4.5s ease-in-out infinite;}
+@keyframes swayObs{0%,100%{transform:translateY(0);}50%{transform:translateY(3px);}}
+
+/* ---------- Picker sections ---------- */
+.panels-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:14px;
+  margin-bottom:22px;
+  align-items:start;
+}
+.picker{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:16px;
+  margin-bottom:0;
+}
+.picker h2{
+  font-family:'Orbitron',sans-serif;
+  font-size:14px;
+  letter-spacing:.02em;
+  margin:0 0 12px;
+  color:var(--text);
+}
+.picker h2 .n{
+  color:var(--amber);
+  margin-right:6px;
+}
+.picker h3.sub{
+  font-family:'Inter',sans-serif;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.04em;
+  color:var(--text-dim);
+  margin:16px 0 10px;
+  text-transform:uppercase;
+}
+
+.swatch-row{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+}
+.swatch{
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:10px 6px 8px;
+  width:72px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+  transition:transform .15s ease, border-color .15s ease, background .15s ease;
+}
+.swatch:hover{transform:translateY(-2px);}
+.swatch svg{width:36px;height:36px;}
+.swatch span{
+  font-size:12px;
+  color:var(--text-dim);
+  text-align:center;
+  line-height:1.2;
+}
+.swatch.selected{
+  border-color:var(--amber);
+  background:var(--panel-2);
+  box-shadow:0 0 0 1px var(--amber), 0 8px 20px -8px rgba(255,184,77,0.5);
+}
+.swatch.selected span{color:var(--text);font-weight:600;}
+
+.card-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+  gap:10px;
+}
+.card{
+  position:relative;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:10px;
+  cursor:pointer;
+  transition:transform .15s ease, border-color .15s ease, background .15s ease;
+}
+.card:hover{transform:translateY(-2px);}
+.card .thumb{
+  width:100%;
+  height:74px;
+  border-radius:12px;
+  margin-bottom:10px;
+  overflow:hidden;
+  position:relative;
+}
+.card .thumb svg{width:100%;height:100%;display:block;}
+.card .label{
+  font-size:13px;
+  font-weight:600;
+  color:var(--text);
+}
+.card.selected{
+  border-color:var(--cyan);
+  background:var(--panel-2);
+  box-shadow:0 0 0 1px var(--cyan), 0 8px 20px -8px rgba(79,214,232,0.5);
+}
+.card .check{
+  position:absolute;
+  top:10px;right:10px;
+  width:20px;height:20px;
+  border-radius:50%;
+  background:var(--cyan);
+  color:#0a0e27;
+  font-size:12px;
+  font-weight:800;
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+.card.selected .check{display:flex;}
+
+/* ---------- Output ---------- */
+.bottom-grid{
+  display:grid;
+  grid-template-columns:1fr 300px;
+  gap:14px;
+  align-items:start;
+}
+.output{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:20px;
+}
+.output h2{
+  font-family:'Orbitron',sans-serif;
+  font-size:15px;
+  margin:0 0 6px;
+}
+.output p.hint{
+  color:var(--text-dim);
+  font-size:13px;
+  margin:0 0 14px;
+  line-height:1.5;
+}
+textarea{
+  width:100%;
+  min-height:180px;
+  resize:vertical;
+  background:#0a0e27;
+  border:1px solid var(--line);
+  border-radius:12px;
+  color:var(--text-dim);
+  font-family:'Inter',monospace;
+  font-size:12.5px;
+  line-height:1.55;
+  padding:14px;
+}
+.actions-panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  height:100%;
+}
+.copy-row{
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  gap:12px;
+}
+.copy-btn{
+  font-family:'Orbitron',sans-serif;
+  font-size:13px;
+  letter-spacing:.03em;
+  color:#0a0e27;
+  background:linear-gradient(90deg,var(--amber),#ffd699);
+  border:none;
+  border-radius:12px;
+  padding:14px 22px;
+  cursor:pointer;
+  font-weight:700;
+  transition:transform .12s ease, box-shadow .12s ease;
+  box-shadow:0 10px 24px -10px rgba(255,184,77,0.6);
+}
+.copy-btn:hover{transform:translateY(-1px);}
+.copy-btn:active{transform:translateY(0);}
+.feedback{
+  font-size:13px;
+  color:var(--green-ok);
+  font-weight:600;
+  opacity:0;
+  transition:opacity .2s ease;
+  text-align:center;
+}
+.feedback.show{opacity:1;}
+.output-note{
+  color:var(--text-dim);
+  font-size:12px;
+  line-height:1.5;
+  margin:0;
+  text-align:center;
+}
+
+@media (max-width:980px){
+  .panels-grid{grid-template-columns:1fr;}
+  .bottom-grid{grid-template-columns:1fr;}
+}
+@media (max-width:480px){
+  .swatch{width:68px;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="brand">🎮 Игровая мастерская</div>
+  <h1>Собери свою игру</h1>
+  <p class="subtitle">Выбирай героя, преграды и мир для своей игры — ниже сразу увидишь, как это будет выглядеть. Когда всё выберешь, скопируй готовый промт внизу и отправь его нейросети, которая пишет код.</p>
+
+  <div class="panels-grid">
+    <section class="picker" data-group="character">
+      <h2><span class="n">1.</span>Выбери героя</h2>
+      <div class="swatch-row" id="characterRow"></div>
+    </section>
+
+    <section class="picker" data-group="obstacle">
+      <h2><span class="n">2.</span>Преграды</h2>
+      <div class="card-row" id="obstacleTypeRow"></div>
+      <h3 class="sub">Цвет преград</h3>
+      <div class="swatch-row" id="obstacleColorRow"></div>
+    </section>
+
+    <section class="picker" data-group="background">
+      <h2><span class="n">3.</span>Мир игры</h2>
+      <div class="card-row" id="backgroundRow"></div>
+    </section>
+  </div>
+
+  <div class="console-wrap">
+    <div class="console-hud">
+      <span><span class="dot"></span>ПРЕВЬЮ ИГРЫ</span>
+      <span class="score">SCORE 000</span>
+    </div>
+    <div class="screen">
+      <svg id="scene" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="grad-day" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#7EC8FF"/>
+            <stop offset="1" stop-color="#D8F3FF"/>
+          </linearGradient>
+          <linearGradient id="grad-space" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#050818"/>
+            <stop offset="1" stop-color="#211448"/>
+          </linearGradient>
+          <linearGradient id="grad-city" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#0c0f2c"/>
+            <stop offset="1" stop-color="#2a1f52"/>
+          </linearGradient>
+          <linearGradient id="grad-mountain" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FFD9A0"/>
+            <stop offset="1" stop-color="#FF8F6B"/>
+          </linearGradient>
+        </defs>
+
+        <!-- backgrounds -->
+        <g id="bg-day">
+          <rect width="400" height="240" fill="url(#grad-day)"/>
+          <circle cx="345" cy="42" r="22" fill="#FFE873"/>
+          <g class="cloud" fill="#ffffff" opacity="0.9">
+            <ellipse cx="70" cy="50" rx="26" ry="12"/><ellipse cx="92" cy="46" rx="18" ry="10"/><ellipse cx="50" cy="46" rx="16" ry="9"/>
+          </g>
+          <g class="cloud cloud2" fill="#ffffff" opacity="0.85">
+            <ellipse cx="230" cy="30" rx="22" ry="10"/><ellipse cx="248" cy="27" rx="15" ry="8"/>
+          </g>
+          <g class="cloud cloud3" fill="#ffffff" opacity="0.8">
+            <ellipse cx="150" cy="80" rx="18" ry="8"/><ellipse cx="164" cy="78" rx="12" ry="7"/>
+          </g>
+        </g>
+
+        <g id="bg-space" style="display:none">
+          <rect width="400" height="240" fill="url(#grad-space)"/>
+          <circle cx="330" cy="50" r="26" fill="#c9c2ff"/>
+          <circle cx="322" cy="42" r="3" fill="#a89fdd"/><circle cx="338" cy="58" r="4" fill="#a89fdd"/><circle cx="340" cy="40" r="2" fill="#a89fdd"/>
+          <g fill="#ffffff">
+            <circle class="star" cx="30" cy="30" r="1.6"/><circle class="star" cx="60" cy="70" r="1.2" style="animation-delay:.4s"/>
+            <circle class="star" cx="100" cy="24" r="1.4" style="animation-delay:.8s"/><circle class="star" cx="140" cy="60" r="1.3" style="animation-delay:1.2s"/>
+            <circle class="star" cx="180" cy="20" r="1.6" style="animation-delay:.2s"/><circle class="star" cx="20" cy="100" r="1.3" style="animation-delay:1.6s"/>
+            <circle class="star" cx="250" cy="90" r="1.4" style="animation-delay:.6s"/><circle class="star" cx="270" cy="40" r="1.5" style="animation-delay:1s"/>
+            <circle class="star" cx="200" cy="100" r="1.2" style="animation-delay:1.4s"/><circle class="star" cx="80" cy="110" r="1.3" style="animation-delay:.3s"/>
+          </g>
+        </g>
+
+        <g id="bg-city" style="display:none">
+          <rect width="400" height="240" fill="url(#grad-city)"/>
+          <circle cx="335" cy="45" r="18" fill="#f4eecb"/>
+          <g fill="#171b3f">
+            <rect x="10" y="110" width="30" height="90"/>
+            <rect x="46" y="90" width="24" height="110"/>
+            <rect x="76" y="130" width="28" height="70"/>
+            <rect x="290" y="100" width="26" height="100"/>
+            <rect x="320" y="140" width="34" height="60"/>
+            <rect x="358" y="115" width="22" height="85"/>
+          </g>
+          <g fill="#ffd479">
+            <rect class="window" x="16" y="120" width="5" height="6"/><rect class="window" x="28" y="120" width="5" height="6" style="animation-delay:.6s"/>
+            <rect class="window" x="16" y="140" width="5" height="6" style="animation-delay:1.1s"/><rect class="window" x="28" y="160" width="5" height="6" style="animation-delay:.3s"/>
+            <rect class="window" x="52" y="100" width="5" height="6" style="animation-delay:.8s"/><rect class="window" x="52" y="120" width="5" height="6" style="animation-delay:1.4s"/>
+            <rect class="window" x="296" y="112" width="5" height="6" style="animation-delay:.5s"/><rect class="window" x="308" y="130" width="5" height="6" style="animation-delay:1s"/>
+            <rect class="window" x="328" y="152" width="5" height="6" style="animation-delay:.2s"/><rect class="window" x="342" y="168" width="5" height="6" style="animation-delay:1.3s"/>
+          </g>
+        </g>
+
+        <g id="bg-mountain" style="display:none">
+          <rect width="400" height="240" fill="url(#grad-mountain)"/>
+          <circle cx="80" cy="70" r="24" fill="#FFF3CE"/>
+          <polygon points="0,200 70,110 140,200" fill="#5b4b7a"/>
+          <polygon points="90,200 170,95 250,200" fill="#4a3d68"/>
+          <polygon points="220,200 300,120 380,200" fill="#5b4b7a"/>
+          <polygon points="20,200 60,150 100,200" fill="#3a2f52"/>
+          <polygon points="300,200 340,155 380,200" fill="#3a2f52"/>
+        </g>
+
+        <!-- ground -->
+        <rect x="0" y="200" width="400" height="40" fill="#2f3358"/>
+        <rect x="0" y="200" width="400" height="6" fill="#454a7d"/>
+
+        <!-- obstacles -->
+        <g id="obstaclePair">
+          <g id="obstacle-pipes">
+            <rect class="obs-fill" x="250" y="0" width="34" height="88" rx="4"/>
+            <rect class="obs-fill obs-dark" x="244" y="78" width="46" height="14" rx="3"/>
+            <rect class="obs-fill" x="250" y="140" width="34" height="60" rx="4"/>
+            <rect class="obs-fill obs-dark" x="244" y="140" width="46" height="14" rx="3"/>
+          </g>
+          <g id="obstacle-columns" style="display:none">
+            <rect class="obs-fill" x="252" y="0" width="30" height="88"/>
+            <rect class="obs-fill obs-line" x="252" y="20" width="30" height="4"/>
+            <rect class="obs-fill obs-line" x="252" y="45" width="30" height="4"/>
+            <rect class="obs-fill obs-line" x="252" y="65" width="30" height="4"/>
+            <rect class="obs-fill obs-dark" x="246" y="82" width="42" height="10"/>
+            <rect class="obs-fill" x="252" y="140" width="30" height="60"/>
+            <rect class="obs-fill obs-line" x="252" y="155" width="30" height="4"/>
+            <rect class="obs-fill obs-line" x="252" y="175" width="30" height="4"/>
+            <rect class="obs-fill obs-dark" x="246" y="140" width="42" height="10"/>
+          </g>
+        </g>
+
+        <!-- character -->
+        <g transform="translate(100,120)">
+          <g id="character">
+            <ellipse class="char-shadow" cx="0" cy="34" rx="16" ry="4" fill="#000000" opacity="0.15"/>
+            <ellipse class="char-wing" cx="-4" cy="6" rx="10" ry="7" fill="#000000" opacity="0.15"/>
+            <circle class="char-fill" cx="0" cy="0" r="18"/>
+            <circle cx="8" cy="-4" r="6" fill="#ffffff"/>
+            <circle cx="10" cy="-4" r="2.6" fill="#12172e"/>
+            <polygon points="16,3 28,1 16,9" fill="#ffb84d"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="bottom-grid">
+    <section class="output">
+      <h2>Твой промт готов</h2>
+      <p class="hint">Скопируй текст ниже и отправь его нейросети, которая пишет код (например, в чат с ИИ‑моделью) — она соберёт твою игру.</p>
+      <textarea id="promptOutput" readonly></textarea>
+    </section>
+    <section class="actions-panel">
+      <div class="copy-row">
+        <button class="copy-btn" id="copyBtn">📋 Скопировать промт</button>
+        <span class="feedback" id="feedback">Готово! Промт скопирован ✅</span>
+        <p class="output-note">После копирования вставь промт в нейросеть, которая пишет код — она соберёт твою игру.</p>
+      </div>
+    </section>
+  </div>
+
+</div>
+
+<script>
+const CHARACTER_COLORS = [
+  {id:'blue', label:'Синий', ru:'синий', hex:'#4A9DFF'},
+  {id:'green', label:'Зелёный', ru:'зелёный', hex:'#5BD97A'},
+  {id:'red', label:'Красный', ru:'красный', hex:'#FF5C5C'},
+  {id:'yellow', label:'Жёлтый', ru:'жёлтый', hex:'#FFD84A'},
+  {id:'purple', label:'Фиолетовый', ru:'фиолетовый', hex:'#B47AFF'},
+];
+
+const OBSTACLE_TYPES = [
+  {id:'pipes', label:'Трубы', ru:'трубы'},
+  {id:'columns', label:'Каменные колонны', ru:'каменные колонны'},
+];
+
+const OBSTACLE_COLORS = [
+  {id:'green', label:'Зелёный', ru:'зелёный', hex:'#4CAF6B', dark:'#399654'},
+  {id:'gray', label:'Серый', ru:'серый', hex:'#9099A6', dark:'#71798a'},
+  {id:'brown', label:'Коричневый', ru:'коричневый', hex:'#9B6B43', dark:'#7c5332'},
+  {id:'black', label:'Чёрный', ru:'чёрный', hex:'#3A3F4B', dark:'#25282f'},
+];
+
+const BACKGROUNDS = [
+  {id:'day', label:'Дневное небо', ru:'дневное небо'},
+  {id:'space', label:'Космос', ru:'космос'},
+  {id:'city', label:'Ночной город', ru:'ночной город'},
+  {id:'mountain', label:'Горный пейзаж', ru:'горный пейзаж'},
+];
+
+const state = {
+  character: 'blue',
+  obstacleType: 'pipes',
+  obstacleColor: 'green',
+  background: 'day',
+};
+
+function charSwatchSVG(hex){
+  return `<svg viewBox="0 0 44 44"><circle cx="22" cy="24" r="16" fill="${hex}"/><circle cx="28" cy="19" r="6" fill="#fff"/><circle cx="29.5" cy="19" r="2.6" fill="#12172e"/><polygon points="34,22 42,20 34,26" fill="#ffb84d"/></svg>`;
+}
+function colorSwatchSVG(hex){
+  return `<svg viewBox="0 0 44 44"><rect x="6" y="6" width="32" height="32" rx="9" fill="${hex}"/></svg>`;
+}
+function pipesThumbSVG(){
+  return `<svg viewBox="0 0 150 74" preserveAspectRatio="none"><rect width="150" height="74" fill="#1b2350"/><rect x="55" y="0" width="18" height="24" rx="3" fill="#5BD97A"/><rect x="51" y="20" width="26" height="8" rx="2" fill="#399654"/><rect x="55" y="46" width="18" height="28" rx="3" fill="#5BD97A"/><rect x="51" y="46" width="26" height="8" rx="2" fill="#399654"/></svg>`;
+}
+function columnsThumbSVG(){
+  return `<svg viewBox="0 0 150 74" preserveAspectRatio="none"><rect width="150" height="74" fill="#1b2350"/><rect x="56" y="0" width="16" height="24" fill="#9099A6"/><rect x="56" y="10" width="16" height="2.5" fill="#71798a"/><rect x="52" y="20" width="24" height="6" fill="#71798a"/><rect x="56" y="48" width="16" height="26" fill="#9099A6"/><rect x="56" y="58" width="16" height="2.5" fill="#71798a"/><rect x="52" y="48" width="24" height="6" fill="#71798a"/></svg>`;
+}
+function bgThumbSVG(id){
+  if(id==='day') return `<svg viewBox="0 0 150 74"><rect width="150" height="74" fill="#7EC8FF"/><circle cx="120" cy="20" r="10" fill="#FFE873"/><ellipse cx="35" cy="30" rx="16" ry="7" fill="#fff"/><ellipse cx="50" cy="27" rx="10" ry="6" fill="#fff"/></svg>`;
+  if(id==='space') return `<svg viewBox="0 0 150 74"><rect width="150" height="74" fill="#0c0f30"/><circle cx="115" cy="24" r="12" fill="#c9c2ff"/><circle cx="20" cy="15" r="1.4" fill="#fff"/><circle cx="40" cy="40" r="1.2" fill="#fff"/><circle cx="70" cy="14" r="1.4" fill="#fff"/><circle cx="90" cy="45" r="1.2" fill="#fff"/><circle cx="15" cy="50" r="1.3" fill="#fff"/></svg>`;
+  if(id==='city') return `<svg viewBox="0 0 150 74"><rect width="150" height="74" fill="#1b1640"/><circle cx="120" cy="18" r="8" fill="#f4eecb"/><rect x="10" y="34" width="14" height="40" fill="#171b3f"/><rect x="28" y="24" width="12" height="50" fill="#171b3f"/><rect x="44" y="40" width="14" height="34" fill="#171b3f"/><rect x="14" y="40" width="3" height="4" fill="#ffd479"/><rect x="32" y="34" width="3" height="4" fill="#ffd479"/><rect x="48" y="48" width="3" height="4" fill="#ffd479"/></svg>`;
+  return `<svg viewBox="0 0 150 74"><rect width="150" height="74" fill="#FFD1A0"/><circle cx="30" cy="22" r="9" fill="#FFF3CE"/><polygon points="0,74 30,34 60,74" fill="#5b4b7a"/><polygon points="45,74 80,26 115,74" fill="#4a3d68"/><polygon points="95,74 125,40 150,74" fill="#5b4b7a"/></svg>`;
+}
+
+function buildSwatches(container, items, groupKey){
+  container.innerHTML = items.map(it => `
+    <button class="swatch" data-group="${groupKey}" data-id="${it.id}" type="button">
+      ${it.hex ? colorSwatchSVG(it.hex) : ''}
+      <span>${it.label}</span>
+    </button>`).join('');
+}
+
+document.getElementById('characterRow').innerHTML = CHARACTER_COLORS.map(it => `
+  <button class="swatch" data-group="character" data-id="${it.id}" type="button">
+    ${charSwatchSVG(it.hex)}
+    <span>${it.label}</span>
+  </button>`).join('');
+
+document.getElementById('obstacleColorRow').innerHTML = OBSTACLE_COLORS.map(it => `
+  <button class="swatch" data-group="obstacleColor" data-id="${it.id}" type="button">
+    ${colorSwatchSVG(it.hex)}
+    <span>${it.label}</span>
+  </button>`).join('');
+
+document.getElementById('obstacleTypeRow').innerHTML = OBSTACLE_TYPES.map(it => `
+  <button class="card" data-group="obstacleType" data-id="${it.id}" type="button">
+    <div class="check">✓</div>
+    <div class="thumb">${it.id==='pipes' ? pipesThumbSVG() : columnsThumbSVG()}</div>
+    <div class="label">${it.label}</div>
+  </button>`).join('');
+
+document.getElementById('backgroundRow').innerHTML = BACKGROUNDS.map(it => `
+  <button class="card" data-group="background" data-id="${it.id}" type="button">
+    <div class="check">✓</div>
+    <div class="thumb">${bgThumbSVG(it.id)}</div>
+    <div class="label">${it.label}</div>
+  </button>`).join('');
+
+function findById(arr, id){ return arr.find(x => x.id === id); }
+
+function render(){
+  document.querySelectorAll('.swatch, .card').forEach(btn => {
+    const group = btn.getAttribute('data-group');
+    const id = btn.getAttribute('data-id');
+    btn.classList.toggle('selected', state[group] === id);
+  });
+
+  const charColor = findById(CHARACTER_COLORS, state.character);
+  document.querySelectorAll('.char-fill').forEach(el => el.setAttribute('fill', charColor.hex));
+
+  document.getElementById('obstacle-pipes').style.display = state.obstacleType === 'pipes' ? '' : 'none';
+  document.getElementById('obstacle-columns').style.display = state.obstacleType === 'columns' ? '' : 'none';
+
+  const obsColor = findById(OBSTACLE_COLORS, state.obstacleColor);
+  document.querySelectorAll('.obs-fill').forEach(el => {
+    if(el.classList.contains('obs-dark')) el.setAttribute('fill', obsColor.dark);
+    else if(el.classList.contains('obs-line')) el.setAttribute('fill', obsColor.dark);
+    else el.setAttribute('fill', obsColor.hex);
+  });
+
+  ['day','space','city','mountain'].forEach(id => {
+    document.getElementById('bg-' + id).style.display = state.background === id ? '' : 'none';
+  });
+
+  updatePrompt();
+}
+
+document.querySelectorAll('.swatch, .card').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.getAttribute('data-group');
+    const id = btn.getAttribute('data-id');
+    state[group] = id;
+    render();
+  });
+});
+
+function buildPrompt(){
+  const charRu = findById(CHARACTER_COLORS, state.character).ru;
+  const typeRu = findById(OBSTACLE_TYPES, state.obstacleType).ru;
+  const obsColorRu = findById(OBSTACLE_COLORS, state.obstacleColor).ru;
+  const bgRu = findById(BACKGROUNDS, state.background).ru;
+
+  return `Ты — разработчик браузерных игр. Тебе необходимо создать простую, но визуально красивую игру по мотивам Flappy Bird. Игра должна корректно запускаться в сервисе CodePen.
+Игровая механика
+— в игре есть главный персонаж;
+— при нажатии на клавишу пробела персонаж поднимается вверх;
+— без нажатия персонаж постепенно падает вниз;
+— на экране появляются вертикальные препятствия, которые движутся справа налево;
+— между препятствиями есть промежуток для пролёта;
+— при столкновении с препятствием или падении на землю игра заканчивается;
+— за каждый успешно пройденный промежуток начисляется 1 очко;
+— текущий счёт отображается на экране.
+Визуальное оформление
+Игра должна выглядеть ярко, аккуратно и современно.
+— у игры есть стартовое меню с названием игры и кнопкой «Начать»;
+— после нажатия на кнопку "Начать" должен быть отсчет 3 - 2 - 1 до старта игры;
+— после проигрыша появляется экран «Игра окончена» с возможностью начать заново;
+— главный персонаж имеет выразительный мультяшный дизайн (глаза, форма, лёгкая анимация движения);
+— препятствия имеют объёмный или декоративный вид;
+— фон содержит дополнительные детали пространства (облака, звёзды, горы, здания или градиент неба);
+— добавь простую анимацию движения фона или элементов;
+— счёт должен быть оформлен крупным читаемым шрифтом;
+— интерфейс должен выглядеть аккуратно и гармонично.
+Параметры оформления
+цвет главного персонажа: ${charRu};
+тип препятствий: ${typeRu};
+цвет препятствий: ${obsColorRu};
+фон игры: ${bgRu}.
+Технические требования
+— весь код должен быть готов к вставке в CodePen;
+— не использовать сложные библиотеки;
+— код должен быть понятным и структурированным.
+Выведи ВЕСЬ код строго в ОДНОМ блоке внутри тега <html>. Никаких разделений на разные файлы, например JS / CSS! Я буду вставлять все в одно окно HTML.`;
+}
+
+function updatePrompt(){
+  document.getElementById('promptOutput').value = buildPrompt();
+}
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const textarea = document.getElementById('promptOutput');
+  const feedback = document.getElementById('feedback');
+
+  function showFeedback(){
+    feedback.classList.add('show');
+    setTimeout(() => feedback.classList.remove('show'), 2200);
+  }
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(textarea.value).then(showFeedback).catch(() => {
+      textarea.select();
+      document.execCommand('copy');
+      showFeedback();
+    });
+  } else {
+    textarea.select();
+    document.execCommand('copy');
+    showFeedback();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
