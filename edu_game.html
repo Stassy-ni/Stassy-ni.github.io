@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Мастерская: Образовательный Автошутер</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800;900&family=Space+Mono:wght@700&display=swap');
+
+:root {
+  --bg-deep: #05050a;
+  --bg-panel: #111118;
+  --line: #222233;
+  --text-main: #f0f0f5;
+  --text-dim: #888899;
+  --accent: #00ffff;
+  --accent-glow: rgba(0, 255, 255, 0.4);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg-deep);
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(255,255,255,0.02) 0%, transparent 50%),
+    radial-gradient(circle at 85% 30%, rgba(255,255,255,0.02) 0%, transparent 50%);
+  color: var(--text-main);
+  font-family: 'Montserrat', sans-serif;
+  min-height: 100vh;
+  padding: 30px 15px 60px;
+}
+
+.container { max-width: 1100px; margin: 0 auto; }
+
+/* Шапка */
+.header { text-align: center; margin-bottom: 40px; }
+.badge {
+  display: inline-block; padding: 6px 15px; border-radius: 20px; font-weight: 800; font-size: 0.75em;
+  letter-spacing: 2px; text-transform: uppercase; margin-bottom: 15px;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--accent); color: var(--accent);
+}
+.header h1 { font-size: 2.8em; font-weight: 900; line-height: 1.1; margin-bottom: 15px; text-transform: uppercase; }
+.header p { color: var(--text-dim); max-width: 600px; margin: 0 auto; line-height: 1.6; }
+
+/* Сетки */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+@media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+/* Секции выбора */
+.section { background: var(--bg-panel); border: 1px solid var(--line); border-radius: 20px; padding: 25px; margin-bottom: 20px; }
+.section h2 { font-size: 1.2em; font-weight: 800; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+.section h2 span { display: inline-flex; justify-content: center; align-items: center; width: 26px; height: 26px; background: var(--accent); color: #000; border-radius: 50%; font-size: 0.8em; }
+
+/* Карточки */
+.card {
+  background: rgba(255,255,255,0.03); border: 2px solid var(--line); border-radius: 16px;
+  padding: 20px 15px; text-align: center; cursor: pointer; transition: 0.2s;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.card:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.2); }
+.card.selected { border-color: var(--accent); background: rgba(255,255,255,0.05); box-shadow: 0 0 20px var(--accent-glow); }
+.c-icon { font-size: 2.5em; margin-bottom: 12px; }
+.c-title { font-weight: 800; margin-bottom: 6px; font-size: 1.1em; }
+.c-desc { font-size: 0.8em; color: var(--text-dim); line-height: 1.4; }
+
+/* ДОСЬЕ */
+.showcase {
+  background: linear-gradient(135deg, rgba(255,255,255,0.05), transparent);
+  border: 2px solid var(--accent); border-radius: 20px; overflow: hidden;
+  position: relative; padding: 25px; box-shadow: inset 0 0 50px var(--accent-glow);
+  transition: all 0.5s ease;
+}
+.sc-title { font-family: 'Space Mono', monospace; color: var(--accent); font-size: 0.8em; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 20px; border-bottom: 1px solid var(--accent); padding-bottom: 10px; }
+
+.sc-row { display: flex; justify-content: space-between; align-items: stretch; gap: 15px; margin-bottom: 20px; }
+.sc-col { flex: 1; background: rgba(0,0,0,0.4); border-radius: 12px; padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+.sc-col h3 { font-size: 0.8em; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px; }
+.sc-emoji-group { display: flex; justify-content: center; gap: 10px; font-size: 2em; margin-bottom: 10px; }
+
+/* Превью Задания */
+.task-preview-box {
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" opacity="0.05"><rect width="100" height="100" fill="none" stroke="%23ffffff" stroke-width="2"/></svg>') #000;
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; text-align: center;
+  position: relative; overflow: hidden;
+}
+.task-preview-box::before {
+  content: "ПАУЗА"; position: absolute; top: 10px; left: 15px; font-weight: 900; color: #ff4757; font-size: 0.8em; letter-spacing: 2px;
+}
+.tp-question {
+  font-size: 2em; font-weight: 900; color: #fff; margin: 15px 0 20px; letter-spacing: 2px; text-shadow: 0 0 10px rgba(255,255,255,0.3);
+}
+/* Сетка кнопок */
+.tp-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tp-btn {
+  background: var(--bg-panel); border: 2px solid var(--accent); border-radius: 8px;
+  padding: 12px; color: #fff; font-weight: 800; font-size: 1em; cursor: default;
+}
+.tp-btn.correct { background: var(--accent); color: #000; }
+/* Поле ввода */
+.tp-input-wrapper { display: flex; justify-content: center; margin-bottom: 10px; }
+.tp-input {
+  background: transparent; border: none; border-bottom: 3px solid var(--accent);
+  color: var(--accent); font-size: 2em; font-weight: 900; width: 150px; text-align: center; outline: none; font-family: 'Space Mono', monospace;
+}
+.tp-input::placeholder { color: rgba(255,255,255,0.2); }
+.tp-hint { font-size: 0.7em; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 15px; }
+
+/* Вывод Промпта */
+.output { background: var(--bg-panel); border: 2px solid var(--accent); border-radius: 20px; padding: 30px; margin-top: 30px; }
+.output h2 { font-size: 1.4em; color: var(--accent); margin-bottom: 10px; font-weight: 900; }
+textarea {
+  width: 100%; height: 200px; background: #000; border: 1px solid var(--line);
+  border-radius: 12px; color: #a29bfe; padding: 20px; font-family: 'Space Mono', monospace;
+  font-size: 13px; resize: vertical; outline: none; margin: 15px 0 20px; line-height: 1.5;
+}
+.btn-copy {
+  background: var(--accent); color: #000; font-weight: 900; font-size: 1.2em;
+  padding: 18px; border: none; border-radius: 12px; cursor: pointer; width: 100%;
+  text-transform: uppercase; transition: 0.2s; box-shadow: 0 0 20px var(--accent-glow);
+}
+.btn-copy:hover { transform: translateY(-2px); filter: brightness(1.2); }
+.toast { text-align: center; color: var(--accent); font-weight: bold; margin-top: 15px; opacity: 0; transition: 0.3s; }
+
+.fade-update { animation: flashUpdate 0.5s ease; }
+@keyframes flashUpdate { 0% { opacity: 0; transform: scale(0.98); filter: brightness(2); } 100% { opacity: 1; transform: scale(1); filter: brightness(1); } }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div class="badge">Образовательнаяя игра</div>
+    <h1>Архитектор Игр</h1>
+    <p>Выбирай сеттинг и механику обучения. Вся логика, генерация врагов и система улучшений сгенерируются ИИ автоматически.</p>
+  </div>
+
+  <div class="grid-2">
+    <!-- Левая колонка -->
+    <div>
+      <div class="section">
+        <h2><span>1</span> Игровой Мир (Скин)</h2>
+        <div class="grid-3" id="theme-row"></div>
+      </div>
+
+      <div class="section">
+        <h2><span>2</span> Обучающий Предмет</h2>
+        <div class="grid-3" id="subject-row"></div>
+      </div>
+
+      <div class="section">
+        <h2><span>3</span> Механика ответа (Сложность)</h2>
+        <div class="grid-2" id="input-row"></div>
+      </div>
+    </div>
+
+    <!-- Правая колонка: ДОСЬЕ -->
+    <div>
+      <div class="showcase" id="showcase-panel">
+        <div class="sc-title">СИСТЕМНОЕ ДОСЬЕ: <span id="sc-world-name" style="color: #fff;"></span></div>
+        
+        <div class="sc-row">
+          <div class="sc-col">
+            <h3>Герои</h3>
+            <div class="sc-emoji-group" id="sc-heroes-emojis"></div>
+          </div>
+          <div class="sc-col">
+            <h3>Враги</h3>
+            <div class="sc-emoji-group" id="sc-enemies-emojis"></div>
+          </div>
+        </div>
+
+        <!-- ПРЕВЬЮ ЗАДАНИЯ -->
+        <div class="sc-col" style="margin-bottom: 0;">
+          <h3 style="color: var(--accent);">Окно задания (При убийстве врага)</h3>
+          <div class="task-preview-box" id="task-preview-box">
+            <!-- Динамический контент превью -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="output">
+    <h2>Твой Промпт Готов</h2>
+    <p style="color: var(--text-dim); font-size: 0.9em;">Скопируй текст и отправь нейросети. Она сгенерирует идеальный код в одном HTML-файле.</p>
+    <textarea id="promptOut" readonly></textarea>
+    <button class="btn-copy" id="copyBtn">СКОПИРОВАТЬ И ВСТАВИТЬ В НЕЙРОСЕТЬ</button>
+    <div class="toast" id="toast">✅ Промпт скопирован! Переходи в чат с ИИ.</div>
+  </div>
+</div>
+
+<script>
+// БАЗА ДАННЫХ
+const DATA = {
+  theme: {
+    fantasy: {
+      id: 'fantasy', icon: '🏰', title: 'Фэнтези', desc: 'Рыцари и Магия', accent: '#FFD700',
+      heroesEmojis: '🤺 🧙 🧝‍♂️', enemiesEmojis: '👹 💀 🐉',
+      uiColor: 'Темно-синий фон, золотые акценты (#FFD700)', bgDesc: 'Темное небо и силуэты замка',
+      heroList: 'Рыцарь 🤺, Маг 🧙, Эльф 🧝‍♂️', enemyList: 'Гоблин 👹, Скелет 💀. Босс: Дракон 🐉'
+    },
+    space: {
+      id: 'space', icon: '🚀', title: 'Космос', desc: 'Лазеры и НЛО', accent: '#00FFFF',
+      heroesEmojis: '🧑‍🚀 🤖 👽', enemiesEmojis: '☄️ 🛸 👾',
+      uiColor: 'Черный фон, неоново-голубые акценты (#00FFFF)', bgDesc: 'Глубокий космос со звездами',
+      heroList: 'Астронавт 🧑‍🚀, Робот 🤖, Пришелец 👽', enemyList: 'Метеорит ☄️, НЛО 🛸. Босс: Мега-Мозг 👾'
+    },
+    eco: {
+      id: 'eco', icon: '🌿', title: 'Эко-Панк', desc: 'Защита природы', accent: '#39FF14',
+      heroesEmojis: '🧑‍🌾 🐼 🦉', enemiesEmojis: '🗑️ 🦗 🧟',
+      uiColor: 'Темно-зеленый фон, салатовые акценты (#39FF14)', bgDesc: 'Ночной лес',
+      heroList: 'Егерь 🧑‍🌾, Панда 🐼, Сова 🦉', enemyList: 'Мусор 🗑️, Саранча 🦗. Босс: Токсичный Монстр 🧟'
+    }
+  },
+  subject: {
+    math: { 
+      id: 'math', icon: '🧮', title: 'Математика', desc: 'Арифметика', 
+      q: '8 × 7 = ?', a1: '42', a2: '56', a3: '64', a4: '54', correct: '56',
+      promptObj: 'Математика. Пул из 20 случайных примеров на сложение, вычитание и умножение (например: 5+7 = ?, 12-4 = ?, 3*4 = ?).' 
+    },
+    rus: { 
+      id: 'rus', icon: '📝', title: 'Русский язык', desc: 'Пропущенная буква', 
+      q: 'М _ Л О К О', a1: 'А', a2: 'И', a3: 'Е', a4: 'О', correct: 'О',
+      promptObj: 'Русский язык. Пул из 20 словарных слов с пропущенной буквой, на месте которой стоит нижнее подчеркивание (например: М_ЛОКО, С_БАКА, Ж_ШИ).' 
+    },
+    eng: { 
+      id: 'eng', icon: '🇬🇧', title: 'Английский', desc: 'Перевод слов', 
+      q: 'SPACE', a1: 'Земля', a2: 'Небо', a3: 'Космос', a4: 'Звезда', correct: 'Космос',
+      promptObj: 'Английский язык. Пул из 20 базовых английских слов для перевода на русский (например: Apple -> Яблоко, Space -> Космос, Dog -> Собака).' 
+    }
+  },
+  inputMode: {
+    buttons: { 
+      id: 'buttons', icon: '👆', title: 'Кнопки', desc: 'Выбор из 4 вариантов. Удобно для телефона.', 
+      promptInst: 'В модальном окне покажи Вопрос и 4 большие красивые HTML-кнопки с вариантами ответов (один правильный, три случайных/неверных). Игрок должен кликнуть мышкой или тапнуть по кнопке с правильным ответом.' 
+    },
+    keyboard: { 
+      id: 'keyboard', icon: '⌨️', title: 'Ввод текста', desc: 'Нужно напечатать ответ на клавиатуре.', 
+      promptInst: 'В модальном окне покажи Вопрос и HTML поле ввода (<input type="text">). Игрок должен напечатать правильный ответ на клавиатуре и нажать клавишу Enter для подтверждения. Сделай автофокус (focus) на поле ввода при появлении окна, чтобы сразу можно было печатать.' 
+    }
+  }
+};
+
+let state = { theme: 'space', subject: 'math', inputMode: 'buttons' };
+
+// Рендер карточек
+function renderCards(type, containerId) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = Object.values(DATA[type]).map(item => `
+    <div class="card ${state[type] === item.id ? 'selected' : ''}" data-type="${type}" data-id="${item.id}">
+      <div class="c-icon">${item.icon}</div>
+      <div class="c-title">${item.title}</div>
+      <div class="c-desc">${item.desc}</div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('click', () => {
+      state[type] = card.dataset.id;
+      container.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      updateUI();
+    });
+  });
+}
+
+// Рендер Превью Задания
+function renderTaskPreview() {
+  const s = DATA.subject[state.subject];
+  const m = state.inputMode;
+  const container = document.getElementById('task-preview-box');
+  
+  let html = `<div class="tp-question">${s.q}</div>`;
+  
+  if (m === 'buttons') {
+    html += `
+      <div class="tp-buttons">
+        <div class="tp-btn">${s.a1}</div>
+        <div class="tp-btn correct">${s.correct}</div>
+        <div class="tp-btn">${s.a3}</div>
+        <div class="tp-btn">${s.a4}</div>
+      </div>
+      <div class="tp-hint">Игрок выбирает 1 из 4 кнопок</div>
+    `;
+  } else {
+    html += `
+      <div class="tp-input-wrapper">
+        <input type="text" class="tp-input" placeholder="_" disabled>
+      </div>
+      <div class="tp-hint">Игрок печатает ответ и жмет ENTER</div>
+    `;
+  }
+  container.innerHTML = html;
+}
+
+// Обновление Досье и Промпта
+function updateUI() {
+  const t = DATA.theme[state.theme];
+  const s = DATA.subject[state.subject];
+  const m = DATA.inputMode[state.inputMode];
+
+  // Меняем акцентный цвет
+  document.documentElement.style.setProperty('--accent', t.accent);
+  document.documentElement.style.setProperty('--accent-glow', `rgba(${hexToRgb(t.accent)}, 0.4)`);
+
+  // Обновляем Досье с анимацией
+  const showcase = document.getElementById('showcase-panel');
+  showcase.classList.remove('fade-update');
+  void showcase.offsetWidth;
+  showcase.classList.add('fade-update');
+
+  document.getElementById('sc-world-name').textContent = t.title.toUpperCase();
+  document.getElementById('sc-heroes-emojis').textContent = t.heroesEmojis;
+  document.getElementById('sc-enemies-emojis').textContent = t.enemiesEmojis;
+  
+  renderTaskPreview();
+
+  // Формируем Промпт
+  const prompt = `Роль: Ты — Senior Game Developer. Твоя задача — написать сложную веб-игру, объединяющую жанры Auto-Shooter, Roguelike и Образовательный Квиз.
+Формат: Строго ОДИН файл index.html, содержащий весь HTML, CSS и Vanilla JavaScript (Canvas API). Никаких внешних картинок/файлов — используй эмодзи для графики.
+
+[НАСТРОЙКИ СЕТТИНГА]
+Цветовая схема UI: ${t.uiColor}
+Герои на выбор: ${t.heroList}
+Враги (падают сверху): ${t.enemyList}
+
+[АРХИТЕКТУРА И МЕНЮ]
+Игра начинается с двух последовательных красивых HTML-модалок поверх Canvas:
+1. Экран выбора героя (покажи 3 героя). У каждого свои статы (скорость, HP, урон).
+2. Экран выбора сложности (Легко, Нормально, Сложно). Влияет на начальное HP врагов и множитель очков.
+После выбора начинается игра на Canvas.
+
+[ИГРОВОЙ ПРОЦЕСС НА CANVAS]
+— Управление: игрок двигается только Влево/Вправо (стрелки клавиатуры).
+— Стрельба: Автоматическая вверх с заданной частотой (fireRate).
+— Враги: Спавнятся сверху и падают вниз. Разные траектории (прямо, зигзаг, синусоида). Над каждым врагом рисуй мини-полоску HP.
+— Босс: Появляется каждые 10 убитых врагов (очень много ХП).
+— Визуал: Многослойный фон (${t.bgDesc}). При попадании во врага и смерти — система частиц на Canvas (взрывы).
+— HUD (Интерфейс): HTML-панель поверх игры. HP, Очки, Индикатор Угрозы, текущие статы оружия.
+
+[ОБРАЗОВАТЕЛЬНАЯ МЕХАНИКА (КВИЗ)]
+Предмет: ${s.promptObj}
+КОГДА ИГРОК УБИВАЕТ ВРАГА:
+1. Игра ставится на жесткую ПАУЗУ (отменяется движение, стрельба и рендер частиц).
+2. Всплывает модальное HTML-окно с вопросом из пула (сгенерируй массив на минимум 20 разных заданий).
+3. МЕХАНИКА ОТВЕТА: ${m.promptInst}
+4. НЕВЕРНЫЙ ответ: окно мигает красным, окно закрывается, игра продолжается без бонуса.
+5. ВЕРНЫЙ ответ: окно закрывается и тут же открывается экран Улучшений (Roguelike).
+
+[СИСТЕМА УЛУЧШЕНИЙ (ROGUELIKE)]
+Создай внутри JS пул из 20 уникальных перков (объектов). Примеры эффектов: "Урон +5", "Двойные пули", "Скорость стрельбы +0.3x", "Ледяные пули (замедляют)", "Самонаводящиеся пули", "Вампиризм (лечение)" и т.д.
+— На экране улучшений покажи 3 СЛУЧАЙНЫХ карточки из пула. Игрок должен кликнуть на одну.
+— При выборе перка: статы игрока навсегда меняются, Индикатор Угрозы растет (все новые враги становятся толще), игра снимается с паузы.
+— Использованные перки не выпадают повторно.
+
+[СМЕРТЬ И КОНЕЦ ИГРЫ]
+Если враг долетает до низа или бьет игрока — урон. HP = 0 — модалка "GAME OVER" с финальным счетом и кнопкой Рестарт.
+
+Пиши код профессионально: классы (class Game, Player, Bullet, Enemy), requestAnimationFrame, физика частиц. Выведи ВЕСЬ код полностью, без сокращений "и так далее".`;
+
+  document.getElementById('promptOut').value = prompt;
+}
+
+function hexToRgb(hex) {
+  let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '0,255,255';
+}
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const txt = document.getElementById('promptOut');
+  txt.select();
+  document.execCommand('copy');
+  const toast = document.getElementById('toast');
+  toast.style.opacity = '1';
+  setTimeout(() => toast.style.opacity = '0', 2500);
+});
+
+// Инициализация
+renderCards('theme', 'theme-row');
+renderCards('subject', 'subject-row');
+renderCards('inputMode', 'input-row');
+updateUI();
+</script>
+</body>
+</html>
