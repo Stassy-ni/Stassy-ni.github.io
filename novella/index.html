@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ПРОТОКОЛ "ХИМЕРА" — Интерактивная новелла</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  :root {
+    --cyan: #00f0ff;
+    --orange: #ff6a00;
+    --red: #ff0040;
+    --dark: #0a0e17;
+    --panel: rgba(10, 20, 35, 0.9);
+  }
+  
+  body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--dark);
+    color: #e0e8f0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+  
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: 
+      radial-gradient(ellipse at 20% 30%, rgba(0, 240, 255, 0.15) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 70%, rgba(255, 106, 0, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 50% 50%, #0a0e17 0%, #000 100%);
+    z-index: -2;
+  }
+  
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: 
+      radial-gradient(1px 1px at 10% 20%, white, transparent),
+      radial-gradient(1px 1px at 30% 60%, white, transparent),
+      radial-gradient(1px 1px at 70% 40%, white, transparent),
+      radial-gradient(1px 1px at 90% 80%, white, transparent),
+      radial-gradient(2px 2px at 50% 10%, rgba(0, 240, 255, 0.8), transparent),
+      radial-gradient(1px 1px at 80% 20%, white, transparent),
+      radial-gradient(1px 1px at 20% 80%, white, transparent);
+    background-size: 100% 100%;
+    z-index: -1;
+    animation: twinkle 4s ease-in-out infinite alternate;
+  }
+  
+  @keyframes twinkle {
+    from { opacity: 0.6; }
+    to { opacity: 1; }
+  }
+  
+  .scanlines {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.15) 50%);
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  
+  /* Главное меню */
+  #main-menu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+    text-align: center;
+  }
+  
+  #main-menu h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: var(--cyan);
+    text-shadow: 
+      0 0 10px var(--cyan),
+      0 0 30px rgba(0, 240, 255, 0.5),
+      0 0 60px rgba(0, 240, 255, 0.3);
+    animation: glitch 3s infinite;
+    margin-bottom: 20px;
+  }
+  
+  @keyframes glitch {
+    0%, 90%, 100% { transform: translate(0); }
+    92% { transform: translate(-2px, 1px); }
+    94% { transform: translate(2px, -1px); }
+    96% { transform: translate(-1px, -1px); }
+  }
+  
+  #main-menu .subtitle {
+    font-size: 1.2rem;
+    color: var(--orange);
+    letter-spacing: 0.3em;
+    margin-bottom: 50px;
+    text-transform: uppercase;
+  }
+  
+  .menu-btn {
+    font-family: 'Orbitron', sans-serif;
+    background: transparent;
+    border: 2px solid var(--cyan);
+    color: var(--cyan);
+    padding: 18px 50px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: all 0.3s;
+    margin: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .menu-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.3), transparent);
+    transition: left 0.5s;
+  }
+  
+  .menu-btn:hover::before { left: 100%; }
+  
+  .menu-btn:hover {
+    background: var(--cyan);
+    color: var(--dark);
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.5);
+  }
+  
+  /* Игровой экран */
+  #game-screen {
+    display: none;
+    min-height: 100vh;
+    position: relative;
+  }
+  
+  #game-screen.active { display: block; }
+  
+  /* Фон локации */
+  #location-bg {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-size: cover;
+    background-position: center;
+    filter: brightness(0.4) contrast(1.1);
+    z-index: -1;
+    transition: background-image 0.8s ease;
+  }
+  
+  /* HUD */
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 15px 25px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 100;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+  }
+  
+  #hud .location-name {
+    color: var(--cyan);
+    text-transform: uppercase;
+  }
+  
+  #hud .status {
+    color: var(--orange);
+  }
+  
+  #hud .variables {
+    display: flex;
+    gap: 15px;
+  }
+  
+  #hud .var {
+    color: rgba(224, 232, 240, 0.6);
+    font-size: 0.7rem;
+  }
+  
+  #hud .var.active {
+    color: var(--orange);
+  }
+  
+  /* Персонажи */
+  #characters {
+    position: fixed;
+    bottom: 280px;
+    left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 5%;
+    pointer-events: none;
+    z-index: 10;
+  }
+  
+  .character {
+    width: 200px;
+    height: 300px;
+    position: relative;
+    transition: all 0.5s;
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  
+  .character.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .character img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 20px rgba(0, 240, 255, 0.3));
+  }
+  
+  .character-name-tag {
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem;
+    color: var(--cyan);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  
+  /* Диалоговое окно */
+  #dialogue-box {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(to top, rgba(10, 14, 23, 0.98), rgba(10, 14, 23, 0.9));
+    border-top: 2px solid var(--cyan);
+    padding: 25px 40px;
+    min-height: 250px;
+    z-index: 50;
+    box-shadow: 0 -10px 40px rgba(0, 240, 255, 0.1);
+  }
+  
+  #speaker-name {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--orange);
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  
+  #dialogue-text {
+    font-size: 1.15rem;
+    line-height: 1.6;
+    color: #e0e8f0;
+    margin-bottom: 20px;
+    min-height: 60px;
+  }
+  
+  /* Кнопки выбора */
+  #choices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 15px;
+  }
+  
+  .choice-btn {
+    font-family: 'Rajdhani', sans-serif;
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    color: white;
+    padding: 15px 25px;
+    cursor: pointer;
+    font-size: 1rem;
+    text-align: left;
+    transition: all 0.3s;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  
+  .choice-btn::before {
+    content: '▸ ';
+    color: var(--orange);
+    font-weight: bold;
+  }
+  
+  .choice-btn:hover {
+    background: rgba(0, 240, 255, 0.2);
+    border-color: var(--cyan);
+    padding-left: 35px;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+  }
+  
+  /* Кнопка "Далее" */
+  #next-btn {
+    font-family: 'Orbitron', sans-serif;
+    background: transparent;
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    padding: 10px 30px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: all 0.3s;
+    float: right;
+  }
+  
+  #next-btn:hover {
+    background: var(--cyan);
+    color: var(--dark);
+  }
+  
+  /* Экран финала */
+  #ending-screen {
+    display: none;
+    min-height: 100vh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    position: relative;
+  }
+  
+  #ending-screen.active { display: flex; }
+  
+  #ending-screen h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    color: var(--cyan);
+    letter-spacing: 0.15em;
+    margin-bottom: 10px;
+    text-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+  }
+  
+  #ending-screen .ending-subtitle {
+    font-size: 1.2rem;
+    color: var(--orange);
+    letter-spacing: 0.2em;
+    margin-bottom: 40px;
+    text-transform: uppercase;
+  }
+  
+  #ending-screen .ending-text {
+    max-width: 700px;
+    font-size: 1.1rem;
+    line-height: 1.8;
+    color: rgba(224, 232, 240, 0.9);
+    margin-bottom: 30px;
+  }
+  
+  #ending-screen .ending-status {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem;
+    padding: 15px 40px;
+    border: 2px solid;
+    margin-bottom: 40px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  
+  .ending-bitter { border-color: #ffaa00; color: #ffaa00; }
+  .ending-tragic { border-color: var(--red); color: var(--red); }
+  .ending-victory { border-color: #00ff88; color: #00ff88; }
+  
+  @media (max-width: 768px) {
+    .character { width: 120px; height: 180px; }
+    #dialogue-box { padding: 20px; min-height: 200px; }
+    #dialogue-text { font-size: 1rem; }
+    #hud { flex-direction: column; gap: 10px; font-size: 0.7rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scanlines"></div>
+
+<!-- ГЛАВНОЕ МЕНЮ -->
+<div id="main-menu">
+  <h1>ПРОТОКОЛ "ХИМЕРА"</h1>
+  <div class="subtitle">Интерактивная новелла · Sci-Fi Survival</div>
+  <button class="menu-btn" onclick="startGame()">Начать игру</button>
+  <button class="menu-btn" onclick="showCredits()">Об игре</button>
+</div>
+
+<!-- ИГРОВОЙ ЭКРАН -->
+<div id="game-screen">
+  <div id="location-bg"></div>
+  
+  <div id="hud">
+    <div class="location-name" id="hud-location">Трюм челнока</div>
+    <div class="variables">
+      <span class="var" id="var-burn">ОЖОГ</span>
+      <span class="var" id="var-stealth">КАРТЫ</span>
+    </div>
+    <div class="status" id="hud-status">УГРОЗА: КРИТИЧЕСКАЯ</div>
+  </div>
+  
+  <div id="characters">
+    <div class="character" id="char-sparky">
+      <img src="character_sparky.jpg" alt="Спарки">
+      <div class="character-name-tag">Спарки</div>
+    </div>
+    <div class="character" id="char-hunter">
+      <img src="character_hunter.jpg" alt="Дрон-Охотник">
+      <div class="character-name-tag">Дрон-Охотник</div>
+    </div>
+    <div class="character" id="char-kai">
+      <img src="character_kai.jpg" alt="Кай">
+      <div class="character-name-tag">Кай</div>
+    </div>
+  </div>
+  
+  <div id="dialogue-box">
+    <div id="speaker-name">СПАРКИ</div>
+    <div id="dialogue-text">Загрузка...</div>
+    <div id="choices"></div>
+    <button id="next-btn" onclick="nextStep()">Далее ▸</button>
+  </div>
+</div>
+
+<!-- ЭКРАН ФИНАЛА -->
+<div id="ending-screen">
+  <h2 id="ending-title">ФИНАЛ</h2>
+  <div class="ending-subtitle" id="ending-subtitle"></div>
+  <div class="ending-text" id="ending-text"></div>
+  <div class="ending-status" id="ending-status"></div>
+  <button class="menu-btn" onclick="location.reload()">Начать заново</button>
+</div>
+
+<script>
+// ==================== ДАННЫЕ ИГРЫ ====================
+
+const scenes = {
+  intro: {
+    location: 'location_hold.jpg',
+    locationName: 'Корабль «Аэрон-7»',
+    status: 'СТАТУС: ДРЕЙФУЕТ',
+    characters: ['kai', 'sparky'],
+    dialogues: [
+      { speaker: 'КАЙ', text: 'Спарки, мы на месте. Корабль корпорации «Аэрон» дрейфует уже три недели. Никаких сигналов.' },
+      { speaker: 'СПАРКИ', text: 'Кай, мои сканеры фиксируют аномальную активность в реакторном отсеке. Вероятность того, что корабль полностью заброшен, составляет 12%.' },
+      { speaker: 'КАЙ', text: '12% — это значит, что мы не одни. Но нам нужны чёрные ящики. Вперёд.' },
+      { speaker: 'СПАРКИ', text: 'Шлюз подключён. Открываю... Кай, пульс учащён. Вероятность того, что этот агрегат настроен дружелюбно, стремится к нулю.' }
+    ],
+    next: 'scene1'
+  },
+  
+  scene1: {
+    location: 'location_hold.jpg',
+    locationName: 'Трюм челнока',
+    status: 'УГРОЗА: ОБНАРУЖЕНА',
+    characters: ['kai', 'sparky', 'hunter'],
+    dialogues: [
+      { speaker: 'СПАРКИ', text: 'Мои сканеры показывают, что он питается от энергии корабля. Это Дрон-Охотник — система зачистки.' },
+      { speaker: 'КАЙ', text: 'Четыре руки, плазменные резаки... Отлично. Спарки, у нас есть варианты?' },
+      { speaker: 'СПАРКИ', text: 'Два. Но оба несут риск.' }
+    ],
+    choices: [
+      { text: 'Схватить плазменный резак и прорваться через Дрона', next: 'scene1a', effect: { burned_hand: true } },
+      { text: 'Ударить по кнопке герметизации переборки и отступить', next: 'scene1b', effect: { stealth_knowledge: true } }
+    ]
+  },
+  
+  scene1a: {
+    location: 'location_hold.jpg',
+    locationName: 'Трюм челнока',
+    status: 'БОЙ',
+    characters: ['kai', 'sparky', 'hunter'],
+    dialogues: [
+      { speaker: 'КАЙ', text: 'Агрессия — лучший способ защиты. Хватаю резак!' },
+      { speaker: '', text: 'Кай бросается вперёд. Искра от плазменного резака обжигает руку, но Дрон на мгновение ослеплён. Этого достаточно, чтобы прорваться в ангар.' },
+      { speaker: 'СПАРКИ', text: 'Кай, у тебя ожог. Но мы прошли. Дрон уже прожёг переборку и ползёт за нами.' }
+    ],
+    next: 'scene2'
+  },
+  
+  scene1b: {
+    location: 'location_hold.jpg',
+    locationName: 'Трюм челнока',
+    status: 'СТЕЛС',
+    characters: ['kai', 'sparky'],
+    dialogues: [
+      { speaker: 'КАЙ', text: 'Не геройствуем. Бью по герметизации!' },
+      { speaker: '', text: 'Тяжёлая переборка падает между вами и Дроном. Спарки взламывает локальную сеть и показывает карту корабля.' },
+      { speaker: 'СПАРКИ', text: 'Я загрузил схемы корабля. У нас есть преимущество — мы знаем маршруты. Но Дрон уже прожёг переборку и движется к ангару.' }
+    ],
+    next: 'scene2'
+  },
+  
+  scene2: {
+    location: 'location_hangar.jpg',
+    locationName: 'Заброшенный ангар',
+    status: 'ХАБ · РАЗВИЛКА',
+    characters: ['kai', 'sparky', 'hunter'],
+    dialogues: [
+      { speaker: 'СПАРКИ', text: 'Я взломал локальную сеть. У нас есть три пути, но Дрон блокирует основной. Нам нужно решить, куда держать курс.' },
+      { speaker: 'КАЙ', text: 'Три пути? Давай варианты.' },
+      { speaker: 'СПАРКИ', text: 'Первый — спасательная капсула в стыковочном узле. Второй — внешний шлюз, можно выбросить Дрона в космос. Третий — палуба реактора, отключить его от питания.' }
+    ],
+    choices: [
+      { text: '🚀 Бежать к спасательной капсуле', next: 'scene2_1' },
+      { text: '🚪 Идти к запертому шлюзу', next: 'scene2_2' },
+      { text: '⚛️ Спуститься на палубу реактора', next: 'scene2_3' }
+    ]
+  },
+  
+  scene2_1: {
+    location: 'location_capsule.jpg',
+    locationName: 'Спасательная капсула',
+    status: 'ПОГОНЯ',
+    characters: ['kai', 'sparky', 'hunter'],
+    dialogues: [
+      { speaker: '', text: 'Вы бежите к стыковочному узлу. Дрон-Охотник настигает вас в коридоре. Капсула заклинило — панель не отвечает.' },
+      { speaker: 'СПАРКИ', text: 'Кай, мне нужно замкнуть контакты вручную. Но я не смогу двигаться, пока держу соединение.' },
+      { speaker: 'КАЙ', text: 'Делай! Я прикрою.' },
+      { speaker: '', text: 'Спарки вставляет манипуляторы в панель. Дрон прыгает. Кай стреляет из болтера, сбивая Дрона с курса, хватает Спарки и запихивает в капсулу.' }
+    ],
+    next: 'final1'
+  },
+  
+  scene2_2: {
+    location: 'location_airlock.jpg',
+    locationName: 'Запертый шлюз',
+    status: 'ЛОВУШКА',
+    characters: ['kai', 'sparky', 'hunter'],
+    dialogues: [
+      { speaker: 'КАЙ', text: 'Заманим Дрона в шлюз и откроем створки. Выбросим его в космос.' },
+      { speaker: '', text: 'Дрон загнан в шлюз. Но панель управления перебита! Створки не открываются. Дрон начинает ломать внутреннюю дверь.' },
+      { speaker: 'СПАРКИ', text: 'Кай, панель можно починить только вручную, изнутри шлюза. Я буду удерживать внешнюю кнопку.' },
+      { speaker: 'КАЙ', text: 'Тогда я запираю тебя снаружи. Иду внутрь.' }
+    ],
+    next: 'final2'
+  },
+  
+  scene2_3: {
+    location: 'location_reactor.jpg',
+    locationName: 'Палуба реактора',
+    status: 'ФИНАЛЬНЫЙ БОСС',
+    characters: ['kai', 'sparky', 'hunter'],
+    dialogues: [
+      { speaker: '', text: 'Вы спускаетесь к гудящему, ослепительно синему ядру реактора. Дрон-Охотник здесь чувствует себя как рыба в воде — он черпает отсюда энергию.' },
+      { speaker: 'СПАРКИ', text: 'Кай, если пробить оболочку охлаждения, произойдёт ЭМИ-взрыв. Он сожжёт электронику Дрона, но корабль начнёт разрушаться!' },
+      { speaker: 'КАЙ', text: 'Тогда у нас нет выбора. Давай действовать.' },
+      { speaker: '', text: 'Дрон нападает. Кай использует гравитационные манипуляторы, чтобы швырять в него топливные стержни. Кай намеренно подставляется под удар Дрона, позволяя тому схватить себя. В этот момент Кай стреляет из плазменного резака в трубу охлаждения реактора за спиной Дрона.' }
+    ],
+    next: 'final3'
+  },
+  
+  final1: {
+    location: 'location_capsule.jpg',
+    locationName: 'Спасательная капсула',
+    status: 'ЭПИЛОГ',
+    characters: ['kai', 'sparky'],
+    dialogues: [
+      { speaker: '', text: 'Капсула выстреливается в космос. Дрон остаётся на корабле. Но Кай понимает, что Спарки получил критические повреждения логи-ядра.' },
+      { speaker: 'СПАРКИ', text: 'Кай... мои системы... я не могу... сохранить...' },
+      { speaker: 'КАЙ', text: 'Спарки, держись! Мы почти дома...' },
+      { speaker: '', text: 'Капсулу подобрал патрульный крейсер. Спарки потерял всю память и личность, став обычным бездушным терминалом. Кай выжил, но потерял лучшего друга. В новостях сообщают, что корпорация «Аэрон» нашла обломки своего корабля и засекретила инцидент.' }
+    ],
+    ending: {
+      title: 'ФИНАЛ 1',
+      subtitle: 'ТЕНЬ В ПУСТОТЕ',
+      text: 'Вы спаслись. Капсулу подобрал патрульный крейсер. Но Спарки потерял всю память и личность, став обычным бездушным терминалом. Кай выжил, но потерял лучшего друга. В новостях сообщают, что корпорация «Аэрон» нашла обломки своего корабля и засекретила инцидент. Вы богаты, но одиноки.',
+      status: 'ГОРЬКОЕ ВЫЖИВАНИЕ',
+      class: 'ending-bitter'
+    }
+  },
+  
+  final2: {
+    location: 'location_airlock.jpg',
+    locationName: 'Запертый шлюз',
+    status: 'ЭПИЛОГ',
+    characters: ['kai', 'sparky'],
+    dialogues: [
+      { speaker: '', text: 'Кай запирает Спарки снаружи, заходя в шлюз вместе с Дроном. Спарки нажимает кнопку. Шлюз открывается.' },
+      { speaker: 'СПАРКИ', text: 'КАЙ! НЕТ!' },
+      { speaker: '', text: 'Дрона и Кая выбрасывает в открытый космос. Дрон мгновенно замерзает и отключается. Кай, привязанный страховочным тросом, болтается в пустоте. Спарки пытается вытащить его, но трос рвётся.' },
+      { speaker: 'КАЙ', text: 'Спарки... лети... живи...' },
+      { speaker: '', text: 'Кай смотрит, как Спарки уменьшается в размерах, передавая последний пакет данных на челнок. Кай становится легендой среди контрабандистов, а Спарки забирает его челнок и улетает, став свободным дроидом.' }
+    ],
+    ending: {
+      title: 'ФИНАЛ 2',
+      subtitle: 'ХОЛОДНЫЙ ВАКУУМ',
+      text: 'Спарки нажимает кнопку. Шлюз открывается. Дрона и Кая выбрасывает в открытый космос. Дрон мгновенно замерзает и отключается. Кай, привязанный страховочным тросом, болтается в пустоте. Спарки пытается вытащить его, но трос рвётся. Кай смотрит, как Спарки уменьшается в размерах, передавая последний пакет данных на челнок. Кай становится легендой среди контрабандистов, а Спарки забирает его челнок и улетает, став свободным дроидом.',
+      status: 'ТРАГИЧЕСКАЯ ЖЕРТВА',
+      class: 'ending-tragic'
+    }
+  },
+  
+  final3: {
+    location: 'location_reactor.jpg',
+    locationName: 'Палуба реактора',
+    status: 'ЭПИЛОГ',
+    characters: ['kai', 'sparky'],
+    dialogues: [
+      { speaker: '', text: 'Реактор взрывается электромагнитной волной. Дрон-Охотник мгновенно выгорает изнутри, превращаясь в груду бесполезного металла.' },
+      { speaker: 'СПАРКИ', text: 'Кай, мы должны бежать! Корабль разрушается!' },
+      { speaker: '', text: 'Кай и Спарки успевают добежать до грузового десантного модуля и отстыковаться. Корабль «Аэрон» остаётся позади, разорванный на куски.' },
+      { speaker: 'СПАРКИ', text: 'Кай, смотри! В обломках Дрона — нетронутый кристалл с навигационными данными и кодами доступа ко всем базам корпорации!' },
+      { speaker: 'КАЙ', text: 'Мы не просто выжили. Мы получили ключи от всей галактической логистики «Аэрон».' }
+    ],
+    ending: {
+      title: 'ФИНАЛ 3',
+      subtitle: 'СИНГУЛЯРНОСТЬ',
+      text: 'Реактор взрывается электромагнитной волной. Дрон-Охотник мгновенно выгорает изнутри, превращаясь в груду бесполезного металла. Кай и Спарки успевают добежать до грузового десантного модуля и отстыковаться. Корабль «Аэрон» остаётся позади, разорванный на куски. В обломках Дрона Спарки находит нетронутый кристалл с навигационными данными и кодами доступа ко всем базам корпорации. Кай не просто выжил — он получил ключи от всей галактической логистики «Аэрон».',
+      status: 'АБСОЛЮТНАЯ ПОБЕДА',
+      class: 'ending-victory'
+    }
+  }
+};
+
+// ==================== СОСТОЯНИЕ ИГРЫ ====================
+
+let gameState = {
+  currentScene: 'intro',
+  dialogueIndex: 0,
+  variables: {
+    burned_hand: false,
+    stealth_knowledge: false
+  }
+};
+
+// ==================== ФУНКЦИИ ====================
+
+function startGame() {
+  document.getElementById('main-menu').style.display = 'none';
+  document.getElementById('game-screen').classList.add('active');
+  loadScene('intro');
+}
+
+function showCredits() {
+  alert('ПРОТОКОЛ "ХИМЕРА"\n\nИнтерактивная новелла в жанре Sci-Fi Survival\n\nСоздано с помощью AI\n2026');
+}
+
+function loadScene(sceneId) {
+  const scene = scenes[sceneId];
+  gameState.currentScene = sceneId;
+  gameState.dialogueIndex = 0;
+  
+  // Обновить фон
+  document.getElementById('location-bg').style.backgroundImage = `url('${scene.location}')`;
+  document.getElementById('hud-location').textContent = scene.locationName;
+  document.getElementById('hud-status').textContent = scene.status;
+  
+  // Обновить переменные
+  updateVariables();
+  
+  // Обновить персонажей
+  updateCharacters(scene.characters);
+  
+  // Показать первый диалог
+  showDialogue();
+}
+
+function updateVariables() {
+  const burnVar = document.getElementById('var-burn');
+  const stealthVar = document.getElementById('var-stealth');
+  
+  if (gameState.variables.burned_hand) {
+    burnVar.classList.add('active');
+  } else {
+    burnVar.classList.remove('active');
+  }
+  
+  if (gameState.variables.stealth_knowledge) {
+    stealthVar.classList.add('active');
+  } else {
+    stealthVar.classList.remove('active');
+  }
+}
+
+function updateCharacters(characters) {
+  document.querySelectorAll('.character').forEach(char => {
+    char.classList.remove('visible');
+  });
+  
+  setTimeout(() => {
+    characters.forEach(charId => {
+      const char = document.getElementById(`char-${charId}`);
+      if (char) char.classList.add('visible');
+    });
+  }, 100);
+}
+
+function showDialogue() {
+  const scene = scenes[gameState.currentScene];
+  const dialogue = scene.dialogues[gameState.dialogueIndex];
+  
+  document.getElementById('speaker-name').textContent = dialogue.speaker || '';
+  document.getElementById('dialogue-text').textContent = dialogue.text;
+  
+  const choicesDiv = document.getElementById('choices');
+  choicesDiv.innerHTML = '';
+  
+  const nextBtn = document.getElementById('next-btn');
+  
+  if (scene.choices && gameState.dialogueIndex === scene.dialogues.length - 1) {
+    // Показать выборы
+    nextBtn.style.display = 'none';
+    scene.choices.forEach(choice => {
+      const btn = document.createElement('button');
+      btn.className = 'choice-btn';
+      btn.textContent = choice.text;
+      btn.onclick = () => makeChoice(choice);
+      choicesDiv.appendChild(btn);
+    });
+  } else if (scene.ending && gameState.dialogueIndex === scene.dialogues.length - 1) {
+    // Показать финал
+    nextBtn.style.display = 'none';
+    setTimeout(() => showEnding(scene.ending), 2000);
+  } else {
+    // Кнопка "Далее"
+    nextBtn.style.display = 'block';
+  }
+}
+
+function nextStep() {
+  const scene = scenes[gameState.currentScene];
+  
+  if (gameState.dialogueIndex < scene.dialogues.length - 1) {
+    gameState.dialogueIndex++;
+    showDialogue();
+  } else if (scene.next) {
+    loadScene(scene.next);
+  }
+}
+
+function makeChoice(choice) {
+  // Применить эффекты
+  if (choice.effect) {
+    Object.keys(choice.effect).forEach(key => {
+      gameState.variables[key] = choice.effect[key];
+    });
+  }
+  
+  loadScene(choice.next);
+}
+
+function showEnding(ending) {
+  document.getElementById('game-screen').classList.remove('active');
+  document.getElementById('ending-screen').classList.add('active');
+  
+  document.getElementById('ending-title').textContent = ending.title;
+  document.getElementById('ending-subtitle').textContent = ending.subtitle;
+  document.getElementById('ending-text').textContent = ending.text;
+  
+  const statusEl = document.getElementById('ending-status');
+  statusEl.textContent = ending.status;
+  statusEl.className = `ending-status ${ending.class}`;
+}
+
+// Запуск при загрузке
+window.onload = () => {
+  console.log('ПРОТОКОЛ "ХИМЕРА" загружен');
+};
+</script>
+
+</body>
+</html>
