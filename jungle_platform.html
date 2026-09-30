@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jungle Runner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            overflow: hidden;
+            font-family: monospace;
+        }
+        canvas { 
+            image-rendering: pixelated;
+            max-width: 100%;
+            max-height: 100%;
+            border: 2px solid #333;
+        }
+        #loading {
+            position: absolute;
+            color: #fff;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Загрузка...</div>
+    <canvas id="game" width="800" height="450"></canvas>
+    
+    <script>
+// ============================================================
+// СЕКЦИЯ 1: КОНФИГУРАЦИЯ
+// ============================================================
+const CONFIG = {
+    player: {
+        maxSpeed: 250,
+        acceleration: 1200,
+        deceleration: 1800,
+        airDeceleration: 400,
+        jumpForce: -520,
+        gravity: 1400,
+        maxFallSpeed: 600,
+        jumpCutMultiplier: 0.4,
+        width: 24,
+        height: 40,
+        coyoteTime: 80,
+        jumpBufferTime: 100
+    },
+    levels: {
+        1: { chunks: 8, maxDiff: 1, gapMultiplier: 0.7, enemySpeed: 0, spawnRate: 0 },
+        2: { chunks: 10, maxDiff: 2, gapMultiplier: 0.8, enemySpeed: 0, spawnRate: 0 },
+        3: { chunks: 12, maxDiff: 3, gapMultiplier: 1.0, enemySpeed: 60, spawnRate: 0.15 },
+        4: { chunks: 14, maxDiff: 4, gapMultiplier: 1.0, enemySpeed: 70, spawnRate: 0.2 },
+        5: { chunks: 16, maxDiff: 5, gapMultiplier: 1.1, enemySpeed: 80, spawnRate: 0.25 },
+        6: { chunks: 18, maxDiff: 6, gapMultiplier: 1.15, enemySpeed: 90, spawnRate: 0.3 },
+        7: { chunks: 20, maxDiff: 7, gapMultiplier: 1.2, enemySpeed: 100, spawnRate: 0.35 },
+        8: { chunks: 22, maxDiff: 8, gapMultiplier: 1.25, enemySpeed: 110, spawnRate: 0.4 },
+        9: { chunks: 24, maxDiff: 9, gapMultiplier: 1.3, enemySpeed: 120, spawnRate: 0.45 },
+        10: { chunks: 26, maxDiff: 10, gapMultiplier: 1.3, enemySpeed: 130, spawnRate: 0.5 }
+    }
+};
+
+// ============================================================
+// СЕКЦИЯ 2: УТИЛИТЫ
+// ============================================================
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function seededRandom(seed) {
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
+}
+function aabbOverlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+// ============================================================
+// СЕКЦИЯ 3: ВВОД
+// ============================================================
+const keys = {};
+window.addEventListener('keydown', e => {
+    keys[e.code] = true;
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        e.preventDefault();
+    }
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+// ============================================================
+// СЕКЦИЯ 4: АУДИО
+// ============================================================
+let audioCtx;
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function playJumpSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.1);
+}
+
+function playLandSound() {
+    if (!audioCtx) return;
+    const bufferSize = audioCtx.sampleRate * 0.1;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.3;
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 400;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    noise.start();
+}
+
+function playCoinSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.05);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.15);
+}
+
+function playDeathSound() {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.5);
+}
+
+let ambientStarted = false;
+function startAmbientMusic() {
+    if (!audioCtx || ambientStarted) return;
+    ambientStarted = true;
+    
+    const bass = audioCtx.createOscillator();
+    bass.type = 'sine';
+    bass.frequency.value = 80;
+    const bassGain = audioCtx.createGain();
+    bassGain.gain.value = 0.05;
+    bass.connect(bassGain);
+    bassGain.connect(audioCtx.destination);
+    bass.start();
+}
+
+// ============================================================
+// СЕКЦИЯ 5: ОБЪЕКТНЫЕ ПУЛЫ
+// ============================================================
+class ObjectPool {
+    constructor(factory, initialSize = 50) {
+        this.pool = [];
+        this.factory = factory;
+        for (let i = 0; i < initialSize; i++) {
+            const obj = this.factory();
+            obj.active = false;
+            this.pool.push(obj);
+        }
+    }
+    get() {
+        const obj = this.pool.find(o => !o.active);
+        if (obj) {
+            obj.active = true;
+            return obj;
+        }
+        const newObj = this.factory();
+        newObj.active = true;
+        this.pool.push(newObj);
+        return newObj;
+    }
+    release(obj) {
+        obj.active = false;
+    }
+}
+
+const particlePool = new ObjectPool(() => ({
+    x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 0, color: '#fff', size: 2, active: false
+}), 200);
+
+// ============================================================
+// СЕКЦИЯ 6: ЧАНКИ УРОВНЯ
+// ============================================================
+const CHUNK_LIBRARY = [
+    // Уровень сложности 1
+    {
+        width: 960,
+        entryPoint: { x: 0, y: 400 },
+        exitPoint: { x: 960, y: 400 },
+        platforms: [
+            { x: 0, y: 432, w: 960, h: 32, type: 'ground' }
+        ],
+        enemies: [],
+        hazards: [],
+        collectibles: [
+            { x: 200, y: 380, type: 'coin' },
+            { x: 400, y: 380, type: 'coin' },
+            { x: 600, y: 380, type: 'coin' }
+        ],
+        difficulty: 1,
+        tags: ['ground']
+    },
+    {
+        width: 960,
+        entryPoint: { x: 0, y: 400 },
+        exitPoint: { x: 960, y: 400 },
+        platforms: [
+            { x: 0, y: 432, w: 320, h: 32, type: 'ground' },
+            { x: 480, y: 432, w: 480, h: 32, type: 'ground' }
+        ],
+        enemies: [],
+        hazards: [],
+        collectibles: [
+            { x: 400, y: 370, type: 'coin' }
+        ],
+        difficulty: 1,
+        tags: ['ground', 'gap']
+    },
+    // Уровень сложности 2
+    {
+        width: 960,
+        entryPoint: { x: 0, y: 400 },
+        exitPoint: { x: 960, y: 336 },
+        platforms: [
+            { x: 0, y: 432, w: 400, h: 32, type: 'ground' },
+            { x: 500, y: 368, w: 460, h: 32, type: 'ground' }
+        ],
+        enemies: [],
+        hazards: [],
+        collectibles: [
+            { x: 600, y: 310, type: 'coin' }
+        ],
+        difficulty: 2,
+        tags: ['ground', 'vertical']
+    },
+    {
+        width: 960,
+        entryPoint: { x: 0, y: 336 },
+        exitPoint: { x: 960, y: 400 },
+        platforms: [
+            { x: 0, y: 368, w: 400, h: 32, type: 'ground' },
+            { x: 500, y: 432, w: 460, h: 32, type: 'ground' }
+        ],
+        enemies: [],
+        hazards: [],
+        collectibles: [
+            { x: 600, y: 380, type: 'coin' }
+        ],
+        difficulty: 2,
+        tags: ['ground', 'vertical']
+    },
+    // Уровень сложности 3
+    {
+        width: 960,
+        entryPoint: { x: 0, y: 400 },
+        exitPoint: { x: 960, y: 400 },
+        platforms: [
+            { x: 0, y: 432, w: 960, h: 32, type: 'ground' }
+        ],
+        enemies: [
+            { x: 400, y: 392, type: 'slime', patrolRange: 100 }
+        ],
+        hazards: [],
+        collectibles: [
+            { x: 300, y: 380, type: 'coin' },
+            { x: 500, y: 380, type: 'coin' }
+        ],
+        difficulty: 3,
+        tags: ['ground', 'enemy']
+    },
+    // Уровень сложности 4
+    {
+        width: 960,
+        entryPoint: { x: 0, y: 400 },
+        exitPoint: { x: 960, y: 400 },
+        platforms: [
+            { x: 0, y: 432, w: 300, h: 32, type: 'ground' },
+            { x: 450, y: 432, w: 510, h: 32, type: 'ground' }
+        ],
+        enemies: [],
+        hazards: [
+            { x: 350, y: 416, w: 80, h: 16, type: 'spikes' }
+        ],
+        collectibles: [
+            { x: 390, y: 360, type: 'coin' }
+        ],
+        difficulty: 4,
+        tags: ['ground', 'hazard']
+    },
+    // Уровень сложности 5
+    {
+        width: 960,
+        entryPoint: { x: 0, y: 400 },
+        exitPoint: { x: 960, y: 400 },
+        platforms: [
+            { x: 0, y: 432, w: 200, h: 32, type: 'ground' },
+            { x: 400, y: 380, w: 120, h: 20, type: 'moving', moveX: 100, moveSpeed: 50 },
+            { x: 700, y: 432, w: 260, h: 32, type: 'ground' }
+        ],
+        enemies: [],
+        hazards: [],
+        collectibles: [
+            { x: 460, y: 330, type: 'coin' }
+        ],
+        difficulty: 5,
+        tags: ['ground', 'moving']
+    },
+    // Уровень сложности 6
+    {
+        width: 960,
+        entryPoint: { x: 0, y: 400 },
+        exitPoint: { x: 960, y: 400 },
+        platforms: [
+            { x: 0, y: 432, w: 300, h: 32, type: 'ground' },
+            { x: 400, y: 432, w: 150, h: 32, type: 'crumbling' },
+            { x: 650, y: 432, w: 310, h: 32, type: 'ground' }
+        ],
+        enemies: [],
+        hazards: [],
+        collectibles: [
+            { x: 475, y: 380, type: 'coin' }
+        ],
+        difficulty: 6,
+        tags: ['ground', 'crumbling']
+    }
+];
+
+// ============================================================
+// СЕКЦИЯ 7: ГЕНЕРАТОР УРОВНЕЙ
+// ============================================================
+function generateLevel(levelNumber) {
+    const levelConfig = CONFIG.levels[Math.min(levelNumber, 10)];
+    const targetChunks = levelConfig.chunks;
+    const maxDifficulty = levelConfig.maxDiff;
+    
+    const availableChunks = CHUNK_LIBRARY.filter(c => c.difficulty <= maxDifficulty);
+    const result = [];
+    
+    // Стартовый чанк (всегда простой)
+    result.push({ ...CHUNK_LIBRARY[0], offsetX: 0 });
+    
+    let currentX = CHUNK_LIBRARY[0].width;
+    
+    for (let i = 1; i < targetChunks - 1; i++) {
+        const chunk = availableChunks[Math.floor(Math.random() * availableChunks.length)];
+        const offsetY = result[result.length - 1].exitPoint.y - chunk.entryPoint.y;
+        
+        result.push({
+            ...chunk,
+            offsetX: currentX,
+            offsetY: offsetY
+        });
+        
+        currentX += chunk.width;
+    }
+    
+    // Финальный чанк с выходом
+    const exitChunk = {
+        width: 400,
+        entryPoint: { x: 0, y: 400 },
+        exitPoint: { x: 400, y: 400 },
+        platforms: [
+            { x: 0, y: 432, w: 400, h: 32, type: 'ground' }
+        ],
+        enemies: [],
+        hazards: [],
+        collectibles: [],
+        difficulty: 1,
+        tags: ['ground'],
+        isExit: true,
+        offsetX: currentX,
+        offsetY: 0
+    };
+    result.push(exitChunk);
+    
+    return result;
+}
+
+// ============================================================
+// СЕКЦИЯ 8: ИГРОК
+// ============================================================
+class Player {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.width = CONFIG.player.width;
+        this.height = CONFIG.player.height;
+        this.grounded = false;
+        this.facingLeft = false;
+        this.state = 'idle';
+        this.coyoteTimer = 0;
+        this.jumpBufferTimer = 0;
+        this.isJumping = false;
+        this.hp = 3;
+        this.invincibleTimer = 0;
+        this.animTimer = 0;
+    }
+    
+    update(dt) {
+        this.animTimer += dt;
+        
+        // Горизонтальное движение
+        const moveLeft = keys['ArrowLeft'] || keys['KeyA'];
+        const moveRight = keys['ArrowRight'] || keys['KeyD'];
+        const jumpKey = keys['Space'] || keys['ArrowUp'] || keys['KeyW'];
+        
+        if (moveLeft && !moveRight) {
+            this.vx -= CONFIG.player.acceleration * dt;
+            this.facingLeft = true;
+        } else if (moveRight && !moveLeft) {
+            this.vx += CONFIG.player.acceleration * dt;
+            this.facingLeft = false;
+        } else {
+            const decel = this.grounded ? CONFIG.player.deceleration : CONFIG.player.airDeceleration;
+            if (this.vx > 0) {
+                this.vx -= decel * dt;
+                if (this.vx < 0) this.vx = 0;
+            } else if (this.vx < 0) {
+                this.vx += decel * dt;
+                if (this.vx > 0) this.vx = 0;
+            }
+        }
+        
+        this.vx = clamp(this.vx, -CONFIG.player.maxSpeed, CONFIG.player.maxSpeed);
+        
+        // Прыжок
+        if (jumpKey) {
+            this.jumpBufferTimer = CONFIG.player.jumpBufferTime;
+        }
+        
+        if (this.grounded) {
+            this.coyoteTimer = CONFIG.player.coyoteTime;
+        } else {
+            this.coyoteTimer -= dt * 1000;
+        }
+        
+        this.jumpBufferTimer -= dt * 1000;
+        
+        if (this.jumpBufferTimer > 0 && this.coyoteTimer > 0) {
+            this.vy = CONFIG.player.jumpForce;
+            this.isJumping = true;
+            this.jumpBufferTimer = 0;
+            this.coyoteTimer = 0;
+            playJumpSound();
+            spawnDust(this.x + this.width / 2, this.y + this.height);
+        }
+        
+        // Variable jump height
+        if (!jumpKey && this.vy < 0 && this.isJumping) {
+            this.vy *= CONFIG.player.jumpCutMultiplier;
+            this.isJumping = false;
+        }
+        
+        // Гравитация
+        this.vy += CONFIG.player.gravity * dt;
+        if (this.vy > CONFIG.player.maxFallSpeed) {
+            this.vy = CONFIG.player.maxFallSpeed;
+        }
+        
+        // Обновление состояния
+        if (this.grounded) {
+            if (Math.abs(this.vx) > 10) {
+                this.state = 'run';
+            } else {
+                this.state = 'idle';
+            }
+        } else {
+            if (this.vy < 0) {
+                this.state = 'jump';
+            } else {
+                this.state = 'fall';
+            }
+        }
+        
+        // Неуязвимость
+        if (this.invincibleTimer > 0) {
+            this.invincibleTimer -= dt;
+        }
+    }
+    
+    takeDamage() {
+        if (this.invincibleTimer > 0) return;
+        this.hp--;
+        this.invincibleTimer = 1.5;
+        playDeathSound();
+        screenShake(8, 0.3);
+        if (this.hp <= 0) {
+            gameState = 'dying';
+            deathTimer = 1.5;
+        }
+    }
+    
+    draw(ctx, cameraX, cameraY) {
+        const x = this.x - cameraX;
+        const y = this.y - cameraY;
+        const breathe = Math.sin(this.animTimer * 3) * 1;
+        
+        ctx.save();
+        ctx.translate(x + this.width / 2, y + this.height);
+        
+        if (this.facingLeft) ctx.scale(-1, 1);
+        
+        // Мигание при неуязвимости
+        if (this.invincibleTimer > 0 && Math.sin(this.animTimer * 20) > 0) {
+            ctx.globalAlpha = 0.5;
+        }
+        
+        // Ноги
+        const legOffset = this.state === 'run' ? Math.sin(this.animTimer * 12) * 4 : 0;
+        ctx.fillStyle = '#4a3020';
+        ctx.fillRect(-8, -12 + legOffset, 6, 12);
+        ctx.fillRect(2, -12 - legOffset, 6, 12);
+        
+        // Тело
+        ctx.fillStyle = '#8b4513';
+        ctx.fillRect(-10, -28 + breathe, 20, 18);
+        
+        // Голова
+        ctx.fillStyle = '#d4a574';
+        ctx.beginPath();
+        ctx.arc(0, -34 + breathe, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Глаза
+        ctx.fillStyle = '#000';
+        ctx.fillRect(2, -36 + breathe, 2, 2);
+        ctx.fillRect(6, -36 + breathe, 2, 2);
+        
+        // Шляпа
+        ctx.fillStyle = '#6b4226';
+        ctx.fillRect(-10, -44 + breathe, 20, 4);
+        ctx.fillRect(-6, -50 + breathe, 12, 6);
+        
+        ctx.restore();
+    }
+}
+
+// ============================================================
+// СЕКЦИЯ 9: ВРАГИ
+// ============================================================
+class Slime {
+    constructor(x, y, patrolRange) {
+        this.x = x;
+        this.y = y;
+        this.startX = x;
+        this.patrolRange = patrolRange;
+        this.width = 28;
+        this.height = 20;
+        this.vx = 60;
+        this.animTimer = 0;
+        this.active = true;
+    }
+    
+    update(dt) {
+        this.animTimer += dt;
+        this.x += this.vx * dt;
+        
+        if (this.x > this.startX + this.patrolRange || this.x < this.startX - this.patrolRange) {
+            this.vx *= -1;
+        }
+    }
+    
+    draw(ctx, cameraX, cameraY) {
+        const x = this.x - cameraX;
+        const y = this.y - cameraY;
+        const squish = Math.sin(this.animTimer * 4) * 2;
+        
+        // Тело
+        ctx.fillStyle = '#4a8a3a';
+        ctx.beginPath();
+        ctx.ellipse(x + this.width / 2, y + this.height / 2, this.width / 2, this.height / 2 + squish, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Глаза
+        ctx.fillStyle = '#000';
+        ctx.fillRect(x + 8, y + 6, 3, 3);
+        ctx.fillRect(x + 17, y + 6, 3, 3);
+        
+        // Рот
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x + this.width / 2, y + 12, 4, 0, Math.PI);
+        ctx.stroke();
+    }
+    
+    getBounds() {
+        return { x: this.x, y: this.y, w: this.width, h: this.height };
+    }
+}
+
+// ============================================================
+// СЕКЦИЯ 10: ЧАСТИЦЫ
+// ============================================================
+function spawnDust(x, y) {
+    for (let i = 0; i < 8; i++) {
+        const p = particlePool.get();
+        p.x = x;
+        p.y = y;
+        p.vx = (Math.random() - 0.5) * 100;
+        p.vy = -Math.random() * 80;
+        p.size = 2 + Math.random() * 2;
+        p.color = '#8B7355';
+        p.life = 0.4;
+        p.maxLife = 0.4;
+    }
+}
+
+function spawnCoinSparkle(x, y) {
+    for (let i = 0; i < 10; i++) {
+        const p = particlePool.get();
+        p.x = x;
+        p.y = y;
+        p.vx = (Math.random() - 0.5) * 150;
+        p.vy = (Math.random() - 0.5) * 150;
+        p.size = 2 + Math.random() * 2;
+        p.color = '#ffd700';
+        p.life = 0.4;
+        p.maxLife = 0.4;
+    }
+}
+
+function updateParticles(dt) {
+    particlePool.pool.forEach(p => {
+        if (!p.active) return;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 400 * dt;
+        p.life -= dt;
+        if (p.life <= 0) {
+            particlePool.release(p);
+        }
+    });
+}
+
+function drawParticles(ctx, cameraX, cameraY) {
+    particlePool.pool.forEach(p => {
+        if (!p.active) return;
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life / p.maxLife;
+        ctx.fillRect(p.x - cameraX, p.y - cameraY, p.size, p.size);
+    });
+    ctx.globalAlpha = 1;
+}
+
+// ============================================================
+// СЕКЦИЯ 11: КАМЕРА И ЭФФЕКТЫ
+// ============================================================
+let cameraX = 0;
+let cameraY = 0;
+let screenShakeAmount = 0;
+let screenShakeTimer = 0;
+
+function screenShake(amount, duration) {
+    screenShakeAmount = amount;
+    screenShakeTimer = duration;
+}
+
+function updateCamera(dt, player) {
+    const targetX = player.x - canvas.width / 2 + player.width / 2;
+    const targetY = player.y - canvas.height / 2 + player.height / 2;
+    
+    cameraX = lerp(cameraX, targetX, 5 * dt);
+    cameraY = lerp(cameraY, targetY, 5 * dt);
+    
+    if (screenShakeTimer > 0) {
+        screenShakeTimer -= dt;
+        cameraX += (Math.random() - 0.5) * screenShakeAmount;
+        cameraY += (Math.random() - 0.5) * screenShakeAmount;
+    }
+}
+
+// ============================================================
+// СЕКЦИЯ 12: РЕНДЕРИНГ ФОНА (ПАРАЛЛАКС)
+// ============================================================
+function drawBackground(ctx) {
+    // Небо (градиент)
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#1a2a3a');
+    gradient.addColorStop(1, '#4a6a4a');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Солнце
+    const sunX = canvas.width * 0.8 - cameraX * 0.05;
+    const sunGradient = ctx.createRadialGradient(sunX, 100, 0, sunX, 100, 80);
+    sunGradient.addColorStop(0, 'rgba(255, 204, 102, 1)');
+    sunGradient.addColorStop(1, 'rgba(255, 204, 102, 0)');
+    ctx.fillStyle = sunGradient;
+    ctx.fillRect(sunX - 80, 20, 160, 160);
+    
+    // Дальние деревья (слой 1)
+    ctx.fillStyle = 'rgba(30, 61, 30, 0.6)';
+    for (let i = 0; i < 20; i++) {
+        const x = (i * 150 - cameraX * 0.2) % (canvas.width + 300) - 150;
+        const height = 100 + seededRandom(i) * 50;
+        ctx.fillRect(x, canvas.height - height - 50, 8, height);
+        ctx.beginPath();
+        ctx.arc(x + 4, canvas.height - height - 50, 30, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // Средние деревья (слой 2)
+    ctx.fillStyle = '#2d5a2d';
+    for (let i = 0; i < 15; i++) {
+        const x = (i * 200 - cameraX * 0.5) % (canvas.width + 400) - 200;
+        const height = 120 + seededRandom(i + 100) * 60;
+        ctx.fillRect(x, canvas.height - height - 30, 12, height);
+        ctx.beginPath();
+        ctx.arc(x + 6, canvas.height - height - 30, 40, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function drawForeground(ctx) {
+    // Ближние кусты (слой 4)
+    ctx.fillStyle = 'rgba(58, 122, 58, 0.7)';
+    for (let i = 0; i < 10; i++) {
+        const x = (i * 250 - cameraX * 1.3) % (canvas.width + 500) - 250;
+        ctx.beginPath();
+        ctx.arc(x, canvas.height - 20, 30, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// ============================================================
+// СЕКЦИЯ 13: РЕНДЕРИНГ УРОВНЯ
+// ============================================================
+function drawLevel(ctx, level) {
+    level.forEach(chunk => {
+        const offsetX = chunk.offsetX || 0;
+        const offsetY = chunk.offsetY || 0;
+        
+        // Платформы
+        chunk.platforms.forEach(p => {
+            const px = p.x + offsetX - cameraX;
+            const py = p.y + offsetY - cameraY;
+            
+            if (px + p.w < 0 || px > canvas.width) return; // Culling
+            
+            if (p.type === 'ground') {
+                // Земля
+                ctx.fillStyle = '#5a3a1a';
+                ctx.fillRect(px, py, p.w, p.h);
+                // Трава сверху
+                ctx.fillStyle = '#4a8a3a';
+                ctx.fillRect(px, py, p.w, 4);
+                // Травинки
+                ctx.strokeStyle = '#4a8a3a';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < p.w; i += 10) {
+                    ctx.beginPath();
+                    ctx.moveTo(px + i, py);
+                    ctx.lineTo(px + i, py - 4);
+                    ctx.stroke();
+                }
+            } else if (p.type === 'crumbling') {
+                ctx.fillStyle = p.shaking ? '#7a5a3a' : '#5a3a1a';
+                ctx.fillRect(px, py, p.w, p.h);
+                // Трещины
+                ctx.strokeStyle = '#3a2a1a';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(px + 20, py);
+                ctx.lineTo(px + 30, py + p.h);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(px + p.w - 30, py);
+                ctx.lineTo(px + p.w - 20, py + p.h);
+                ctx.stroke();
+            } else if (p.type === 'moving') {
+                ctx.fillStyle = '#6b4226';
+                ctx.fillRect(px, py, p.w, p.h);
+                // Кольца бревна
+                ctx.strokeStyle = '#4a3020';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(px + 10, py + p.h / 2, 5, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(px + p.w - 10, py + p.h / 2, 5, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        });
+        
+        // Шипы
+        chunk.hazards.forEach(h => {
+            if (h.type === 'spikes') {
+                const hx = h.x + offsetX - cameraX;
+                const hy = h.y + offsetY - cameraY;
+                
+                if (hx + h.w < 0 || hx > canvas.width) return;
+                
+                ctx.fillStyle = '#8a8a8a';
+                for (let i = 0; i < h.w; i += 10) {
+                    ctx.beginPath();
+                    ctx.moveTo(hx + i, hy + h.h);
+                    ctx.lineTo(hx + i + 5, hy);
+                    ctx.lineTo(hx + i + 10, hy + h.h);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+        });
+        
+        // Монеты
+        chunk.collectibles.forEach(c => {
+            if (c.collected) return;
+            
+            const cx = c.x + offsetX - cameraX;
+            const cy = c.y + offsetY - cameraY;
+            
+            if (cx < -20 || cx > canvas.width + 20) return;
+            
+            if (c.type === 'coin') {
+                const rotation = Math.sin(Date.now() / 200) * 0.3;
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.scale(Math.cos(rotation), 1);
+                
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#ffd700';
+                ctx.fillStyle = '#ffd700';
+                ctx.beginPath();
+                ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#ffed4e';
+                ctx.beginPath();
+                ctx.arc(-2, -2, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        });
+        
+        // Выход
+        if (chunk.isExit) {
+            const exitX = chunk.offsetX + 200 - cameraX;
+            const exitY = chunk.offsetY + 350 - cameraY;
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ffd700';
+            ctx.fillRect(exitX, exitY, 40, 80);
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('EXIT', exitX + 20, exitY - 10);
+        }
+    });
+}
+
+// ============================================================
+// СЕКЦИЯ 14: UI
+// ============================================================
+function drawHUD(ctx, player, score, level) {
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.font = 'bold 20px monospace';
+    ctx.textAlign = 'left';
+    
+    // Счёт
+    ctx.strokeText(`SCORE: ${score}`, 20, 30);
+    ctx.fillText(`SCORE: ${score}`, 20, 30);
+    
+    // Уровень
+    ctx.textAlign = 'center';
+    ctx.strokeText(`LEVEL ${level}`, canvas.width / 2, 30);
+    ctx.fillText(`LEVEL ${level}`, canvas.width / 2, 30);
+    
+    // HP (сердца)
+    ctx.textAlign = 'right';
+    for (let i = 0; i < player.hp; i++) {
+        const hx = canvas.width - 30 - i * 30;
+        const hy = 20;
+        ctx.fillStyle = '#ff0000';
+        ctx.beginPath();
+        ctx.arc(hx - 5, hy, 8, 0, Math.PI * 2);
+        ctx.arc(hx + 5, hy, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(hx - 13, hy);
+        ctx.lineTo(hx, hy + 15);
+        ctx.lineTo(hx + 13, hy);
+        ctx.fill();
+    }
+}
+
+function drawMenu(ctx) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#ffd700';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.font = 'bold 48px monospace';
+    ctx.textAlign = 'center';
+    ctx.strokeText('JUNGLE RUNNER', canvas.width / 2, 150);
+    ctx.fillText('JUNGLE RUNNER', canvas.width / 2, 150);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = '20px monospace';
+    ctx.fillText('Нажмите ENTER для начала', canvas.width / 2, 250);
+    
+    ctx.font = '16px monospace';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('A/D или ←/→ - движение', canvas.width / 2, 320);
+    ctx.fillText('SPACE или ↑ - прыжок', canvas.width / 2, 350);
+    ctx.fillText('ESC - пауза', canvas.width / 2, 380);
+}
+
+function drawPause(ctx) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.strokeText('ПАУЗА', canvas.width / 2, canvas.height / 2);
+    ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2);
+    
+    ctx.font = '20px monospace';
+    ctx.fillText('Нажмите ESC для продолжения', canvas.width / 2, canvas.height / 2 + 50);
+}
+
+function drawDeath(ctx) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#ff0000';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.font = 'bold 48px monospace';
+    ctx.textAlign = 'center';
+    ctx.strokeText('ТЫ ПОГИБ', canvas.width / 2, canvas.height / 2 - 30);
+    ctx.fillText('ТЫ ПОГИБ', canvas.width / 2, canvas.height / 2 - 30);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = '24px monospace';
+    ctx.fillText(`Счёт: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
+    ctx.fillText('Нажмите ENTER для рестарта', canvas.width / 2, canvas.height / 2 + 60);
+}
+
+function drawLevelComplete(ctx) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.fillStyle = '#ffd700';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.font = 'bold 48px monospace';
+    ctx.textAlign = 'center';
+    ctx.strokeText('УРОВЕНЬ ПРОЙДЕН!', canvas.width / 2, canvas.height / 2 - 50);
+    ctx.fillText('УРОВЕНЬ ПРОЙДЕН!', canvas.width / 2, canvas.height / 2 - 50);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = '24px monospace';
+    ctx.fillText(`Счёт: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+    ctx.fillText('Нажмите ENTER для следующего уровня', canvas.width / 2, canvas.height / 2 + 50);
+}
+
+// ============================================================
+// СЕКЦИЯ 15: ИГРОВОЕ СОСТОЯНИЕ
+// ============================================================
+let gameState = 'menu'; // menu, playing, paused, dying, levelComplete
+let player;
+let currentLevel = [];
+let enemies = [];
+let score = 0;
+let levelNumber = 1;
+let deathTimer = 0;
+let levelCompleteTimer = 0;
+
+function initGame() {
+    player = new Player(100, 300);
+    currentLevel = generateLevel(levelNumber);
+    enemies = [];
+    score = 0;
+    
+    // Спавн врагов
+    currentLevel.forEach(chunk => {
+        const offsetX = chunk.offsetX || 0;
+        const offsetY = chunk.offsetY || 0;
+        
+        chunk.enemies.forEach(e => {
+            if (e.type === 'slime') {
+                enemies.push(new Slime(e.x + offsetX, e.y + offsetY, e.patrolRange));
+            }
+        });
+    });
+}
+
+function resetLevel() {
+    player = new Player(100, 300);
+    currentLevel = generateLevel(levelNumber);
+    enemies = [];
+    
+    currentLevel.forEach(chunk => {
+        const offsetX = chunk.offsetX || 0;
+        const offsetY = chunk.offsetY || 0;
+        
+        chunk.enemies.forEach(e => {
+            if (e.type === 'slime') {
+                enemies.push(new Slime(e.x + offsetX, e.y + offsetY, e.patrolRange));
+            }
+        });
+        
+        chunk.collectibles.forEach(c => c.collected = false);
+    });
+}
+
+function nextLevel() {
+    levelNumber++;
+    resetLevel();
+}
+
+// ============================================================
+// СЕКЦИЯ 16: ФИЗИКА И КОЛЛИЗИИ
+// ============================================================
+function updatePhysics(dt) {
+    const wasGrounded = player.grounded;
+    player.grounded = false;
+    
+    // Движущиеся платформы
+    currentLevel.forEach(chunk => {
+        const offsetX = chunk.offsetX || 0;
+        const offsetY = chunk.offsetY || 0;
+        
+        chunk.platforms.forEach(p => {
+            if (p.type === 'moving') {
+                if (!p.moveTimer) p.moveTimer = 0;
+                p.moveTimer += dt;
+                p.currentX = p.x + Math.sin(p.moveTimer * p.moveSpeed / 100) * p.moveX;
+            } else if (p.type === 'crumbling') {
+                if (p.touched && !p.fallen) {
+                    p.shakeTimer = (p.shakeTimer || 0) + dt;
+                    p.shaking = true;
+                    if (p.shakeTimer > 1) {
+                        p.fallen = true;
+                    }
+                }
+            }
+        });
+    });
+    
+    // Двигаем игрока по X
+    player.x += player.vx * dt;
+    
+    // Коллизии по X
+    currentLevel.forEach(chunk => {
+        const offsetX = chunk.offsetX || 0;
+        const offsetY = chunk.offsetY || 0;
+        
+        chunk.platforms.forEach(p => {
+            if (p.fallen) return;
+            
+            const px = (p.currentX || p.x) + offsetX;
+            const py = p.y + offsetY;
+            const platform = { x: px, y: py, w: p.w, h: p.h };
+            const playerBox = { x: player.x, y: player.y, w: player.width, h: player.height };
+            
+            if (aabbOverlap(playerBox, platform)) {
+                if (player.vx > 0) {
+                    player.x = px - player.width;
+                } else if (player.vx < 0) {
+                    player.x = px + p.w;
+                }
+                player.vx = 0;
+            }
+        });
+    });
+    
+    // Двигаем игрока по Y
+    player.y += player.vy * dt;
+    
+    // Коллизии по Y
+    currentLevel.forEach(chunk => {
+        const offsetX = chunk.offsetX || 0;
+        const offsetY = chunk.offsetY || 0;
+        
+        chunk.platforms.forEach(p => {
+            if (p.fallen) return;
+            
+            const px = (p.currentX || p.x) + offsetX;
+            const py = p.y + offsetY;
+            const platform = { x: px, y: py, w: p.w, h: p.h };
+            const playerBox = { x: player.x, y: player.y, w: player.width, h: player.height };
+            
+            if (aabbOverlap(playerBox, platform)) {
+                if (player.vy > 0) {
+                    player.y = py - player.height;
+                    player.grounded = true;
+                    player.vy = 0;
+                    
+                    if (!wasGrounded) {
+                        playLandSound();
+                        spawnDust(player.x + player.width / 2, player.y + player.height);
+                    }
+                    
+                    if (p.type === 'crumbling' && !p.touched) {
+                        p.touched = true;
+                    }
+                } else if (player.vy < 0) {
+                    player.y = py + p.h;
+                    player.vy = 0;
+                }
+            }
+        });
+    });
+    
+    // Шипы
+    currentLevel.forEach(chunk => {
+        const offsetX = chunk.offsetX || 0;
+        const offsetY = chunk.offsetY || 0;
+        
+        chunk.hazards.forEach(h => {
+            if (h.type === 'spikes') {
+                const hx = h.x + offsetX;
+                const hy = h.y + offsetY;
+                const hazardBox = { x: hx, y: hy, w: h.w, h: h.h };
+                const playerBox = { x: player.x, y: player.y, w: player.width, h: player.height };
+                
+                if (aabbOverlap(playerBox, hazardBox)) {
+                    player.takeDamage();
+                }
+            }
+        });
+    });
+    
+    // Враги
+    enemies.forEach(enemy => {
+        if (!enemy.active) return;
+        
+        const enemyBox = enemy.getBounds();
+        const playerBox = { x: player.x, y: player.y, w: player.width, h: player.height };
+        
+        if (aabbOverlap(playerBox, enemyBox)) {
+            // Прыжок на врага
+            if (player.vy > 0 && player.y + player.height - enemy.y < 20) {
+                enemy.active = false;
+                player.vy = CONFIG.player.jumpForce * 0.7;
+                score += 100;
+                spawnCoinSparkle(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+            } else {
+                player.takeDamage();
+            }
+        }
+    });
+    
+    // Монеты
+    currentLevel.forEach(chunk => {
+        const offsetX = chunk.offsetX || 0;
+        const offsetY = chunk.offsetY || 0;
+        
+        chunk.collectibles.forEach(c => {
+            if (c.collected) return;
+            
+            const cx = c.x + offsetX;
+            const cy = c.y + offsetY;
+            const coinBox = { x: cx - 8, y: cy - 8, w: 16, h: 16 };
+            const playerBox = { x: player.x, y: player.y, w: player.width, h: player.height };
+            
+            if (aabbOverlap(playerBox, coinBox)) {
+                c.collected = true;
+                score += c.type === 'coin' ? 10 : 50;
+                playCoinSound();
+                spawnCoinSparkle(cx, cy);
+            }
+        });
+    });
+    
+    // Выход
+    currentLevel.forEach(chunk => {
+        if (chunk.isExit) {
+            const exitX = chunk.offsetX + 200;
+            const exitY = chunk.offsetY + 350;
+            const exitBox = { x: exitX, y: exitY, w: 40, h: 80 };
+            const playerBox = { x: player.x, y: player.y, w: player.width, h: player.height };
+            
+            if (aabbOverlap(playerBox, exitBox)) {
+                gameState = 'levelComplete';
+                levelCompleteTimer = 2;
+            }
+        }
+    });
+    
+    // Падение в пропасть
+    if (player.y > 600) {
+        player.takeDamage();
+        if (player.hp > 0) {
+            resetLevel();
+        }
+    }
+}
+
+// ============================================================
+// СЕКЦИЯ 17: UPDATE
+// ============================================================
+function update(dt) {
+    if (gameState === 'menu') {
+        if (keys['Enter']) {
+            initGame();
+            gameState = 'playing';
+            startAmbientMusic();
+        }
+    } else if (gameState === 'playing') {
+        if (keys['Escape']) {
+            gameState = 'paused';
+            keys['Escape'] = false;
+        }
+        
+        player.update(dt);
+        updatePhysics(dt);
+        updateCamera(dt, player);
+        
+        enemies.forEach(e => {
+            if (e.active) e.update(dt);
+        });
+        
+        updateParticles(dt);
+    } else if (gameState === 'paused') {
+        if (keys['Escape']) {
+            gameState = 'playing';
+            keys['Escape'] = false;
+        }
+    } else if (gameState === 'dying') {
+        deathTimer -= dt;
+        if (deathTimer <= 0) {
+            if (keys['Enter']) {
+                levelNumber = 1;
+                resetLevel();
+                gameState = 'playing';
+            }
+        }
+    } else if (gameState === 'levelComplete') {
+        levelCompleteTimer -= dt;
+        if (levelCompleteTimer <= 0 && keys['Enter']) {
+            nextLevel();
+            gameState = 'playing';
+        }
+    }
+}
+
+// ============================================================
+// СЕКЦИЯ 18: RENDER
+// ============================================================
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    if (gameState === 'menu') {
+        drawBackground(ctx);
+        drawMenu(ctx);
+    } else if (gameState === 'playing' || gameState === 'paused' || gameState === 'dying' || gameState === 'levelComplete') {
+        drawBackground(ctx);
+        drawLevel(ctx, currentLevel);
+        
+        enemies.forEach(e => {
+            if (e.active) e.draw(ctx, cameraX, cameraY);
+        });
+        
+        player.draw(ctx, cameraX, cameraY);
+        drawParticles(ctx, cameraX, cameraY);
+        drawForeground(ctx);
+        drawHUD(ctx, player, score, levelNumber);
+        
+        if (gameState === 'paused') drawPause(ctx);
+        if (gameState === 'dying') drawDeath(ctx);
+        if (gameState === 'levelComplete') drawLevelComplete(ctx);
+    }
+}
+
+// ============================================================
+// СЕКЦИЯ 19: GAME LOOP
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+    const deltaTime = (timestamp - lastTime) / 1000;
+    lastTime = timestamp;
+    
+    const clampedDt = Math.min(deltaTime, 0.05);
+    
+    update(clampedDt);
+    render();
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// ============================================================
+// СЕКЦИЯ 20: ИНИЦИАЛИЗАЦИЯ
+// ============================================================
+document.getElementById('loading').style.display = 'none';
+
+document.addEventListener('click', () => {
+    initAudio();
+}, { once: true });
+
+requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
