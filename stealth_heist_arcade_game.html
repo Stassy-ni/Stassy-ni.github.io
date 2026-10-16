@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Стелс-воришка: Ночной рейд (Stealth Heist)</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;600;700&display=swap');
+
+    :root {
+      --font-display: 'Chakra Petch', sans-serif;
+      --font-body: 'Inter', sans-serif;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background-color: #080a10;
+      color: #f1f5f9;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    .font-cyber {
+      font-family: var(--font-display);
+      letter-spacing: 0.05em;
+    }
+
+    /* Glow utilities */
+    .glow-cyan {
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.45);
+    }
+    .glow-amber {
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+    }
+    .glow-red {
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
+    }
+
+    /* Custom canvas styling */
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    /* Scanline overlay effect */
+    .scanlines {
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0),
+        rgba(255,255,255,0) 50%,
+        rgba(0, 0, 0, 0.28) 50%,
+        rgba(0, 0, 0, 0.28)
+      );
+      background-size: 100% 4px;
+      pointer-events: none;
+    }
+
+    /* Spinner animation */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .animate-spin-slow {
+      animation: spin 3s linear infinite;
+    }
+
+    /* Pulse effect */
+    @keyframes stealth-pulse {
+      0%, 100% { opacity: 0.9; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.08); }
+    }
+    .pulse-glow {
+      animation: stealth-pulse 1.8s infinite ease-in-out;
+    }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-2 sm:p-4 overflow-hidden relative">
+
+  <div class="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div class="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/15 rounded-full blur-[100px]"></div>
+    <div class="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-600/15 rounded-full blur-[100px]"></div>
+  </div>
+
+  <!-- Main Game Frame -->
+  <main class="relative z-10 w-full max-w-[840px] flex flex-col items-center">
+    
+    <!-- Header Bar -->
+    <header class="w-full flex items-center justify-between mb-2 px-3 py-2 bg-slate-900/80 border border-slate-800 rounded-xl backdrop-blur-md">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+          <i class="fa-solid fa-user-ninja text-sm"></i>
+        </div>
+        <div>
+          <h1 id="gameHeaderTitle" class="font-cyber font-bold text-sm sm:text-base tracking-wide text-white cursor-pointer select-none transition-colors hover:text-cyan-400" title="Кликни 5 раз подряд!">
+            С Т Е Л С - В О Р И Ш К А <span class="text-xs text-cyan-400 font-mono">v1.2</span>
+          </h1>
+          <p class="text-[10px] text-slate-400">Ночное проникновение в хранилище</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Rewarded Ad Trigger Button -->
+        <button id="headerAdBtn" class="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-semibold tracking-wide transition-all active:scale-95">
+          <i class="fa-solid fa-film text-amber-400 animate-pulse"></i>
+          <span class="hidden sm:inline">Бонус-Видео</span>
+        </button>
+
+        <!-- Help / Cheats Modal Trigger -->
+        <button id="helpBtn" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center justify-center text-xs transition-colors" title="Инструкция и Чит-коды">
+          <i class="fa-solid fa-circle-question"></i>
+        </button>
+
+        <!-- Promo Code Trigger -->
+        <button id="promoModalBtn" class="w-8 h-8 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-400 flex items-center justify-center text-xs transition-colors" title="Ввести промокод">
+          <i class="fa-solid fa-gift"></i>
+        </button>
+      </div>
+    </header>
+
+    <div id="canvasContainer" class="relative w-full aspect-[4/3] max-h-[580px] bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex items-center justify-center">
+      <!-- Game Canvas -->
+      <canvas id="gameCanvas" width="800" height="600" class="w-full h-full object-contain"></canvas>
+      
+      <!-- Scanline visual layer -->
+      <div class="scanlines absolute inset-0"></div>
+
+      <!-- In-Game Floating HUD (Active during play) -->
+      <div id="gameHud" class="absolute top-3 inset-x-3 flex justify-between items-start pointer-events-none transition-opacity duration-300">
+        <!-- Left HUD: Diamond Counter & Score -->
+        <div class="flex flex-col gap-1.5 pointer-events-auto">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700/80 shadow-md">
+            <i class="fa-solid fa-gem text-cyan-400 text-xs"></i>
+            <span class="text-xs text-slate-400">Счет:</span>
+            <span id="hudScore" class="font-cyber font-bold text-white text-sm">0</span>
+          </div>
+          <div class="flex items-center gap-2 px-3 py-1 rounded-lg bg-slate-900/90 border border-slate-700/80 text-[11px] text-slate-300">
+            <i class="fa-solid fa-key text-amber-400"></i>
+            <span>Алмазы:</span>
+            <span id="hudGemsRatio" class="font-bold text-cyan-300">0 / 0</span>
+          </div>
+        </div>
+
+        <!-- Center HUD: Active Powerups Buffs -->
+        <div id="buffContainer" class="flex flex-col items-center gap-1">
+          <div id="stealthBuffBadge" class="hidden items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/20 border border-cyan-400 text-cyan-300 text-xs font-semibold shadow-lg backdrop-blur-md">
+            <i class="fa-solid fa-ghost animate-bounce text-cyan-400"></i>
+            <span>Стелс:</span>
+            <span id="stealthTimerText" class="font-mono">5.0s</span>
+          </div>
+          <div id="doubleBuffBadge" class="hidden items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400 text-purple-300 text-xs font-semibold shadow-lg backdrop-blur-md">
+            <i class="fa-solid fa-bolt text-purple-400"></i>
+            <span>2X Очки:</span>
+            <span id="doubleTimerText" class="font-mono">10.0s</span>
+          </div>
+        </div>
+
+        <!-- Right HUD: Highscore and Level -->
+        <div class="flex flex-col gap-1.5 items-end">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-700/80 shadow-md">
+            <i class="fa-solid fa-trophy text-amber-400 text-xs"></i>
+            <span class="text-xs text-slate-400">Рекорд:</span>
+            <span id="hudHighScore" class="font-cyber font-bold text-amber-400 text-sm">0</span>
+          </div>
+          <div class="px-2.5 py-0.5 rounded-md bg-slate-800/80 border border-slate-700 text-[10px] text-slate-400">
+            Зона: <span id="hudLevelNum" class="text-white font-bold">1</span>
+          </div>
+        </div>
+      </div>
+
+      
+      <!-- START SCREEN OVERLAY -->
+      <div id="startOverlay" class="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-16 h-16 rounded-2xl bg-cyan-500/10 border-2 border-cyan-500/30 flex items-center justify-center mb-4 text-cyan-400 text-2xl shadow-lg glow-cyan">
+          <i class="fa-solid fa-mask"></i>
+        </div>
+
+        <h2 class="text-2xl sm:text-4xl font-cyber font-black tracking-wider text-white mb-1">
+          НОЧНОЕ ОГРАБЛЕНИЕ
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-400 max-w-md mb-6 leading-relaxed">
+          Проникни в музей, собери все алмазы и уйди через вентиляционный люк. Не пересекай красные конусы зрения охраны!
+        </p>
+
+        <!-- Record Info Pill -->
+        <div class="flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 mb-6">
+          <i class="fa-solid fa-crown text-amber-400"></i>
+          <span class="text-xs text-slate-400">Лучший рекорд:</span>
+          <span id="menuHighScoreVal" class="font-cyber font-bold text-amber-400 text-base">0</span>
+        </div>
+
+        <!-- Start & Extra Buttons -->
+        <div class="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+          <button id="startGameBtn" class="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-cyber font-bold text-sm tracking-wider shadow-lg shadow-cyan-500/25 active:scale-95 transition-all">
+            <i class="fa-solid fa-play mr-2"></i> НАЧАТЬ ВЗЛОМ
+          </button>
+          
+          <button id="menuAdRewardBtn" class="py-3 px-4 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-semibold text-xs flex items-center justify-center gap-2 active:scale-95 transition-all">
+            <i class="fa-solid fa-gift text-amber-400"></i>
+            <span>+500 Бонус</span>
+          </button>
+        </div>
+
+        <!-- Controls Hint -->
+        <div class="mt-6 flex flex-wrap justify-center items-center gap-2 text-[11px] text-slate-400">
+          <span class="px-2 py-1 rounded bg-slate-800 border border-slate-700 font-mono text-slate-300">W A S D</span>
+          <span>или</span>
+          <span class="px-2 py-1 rounded bg-slate-800 border border-slate-700 font-mono text-slate-300">Стрелочки</span>
+          <span>для передвижения</span>
+        </div>
+      </div>
+
+      <!-- GAME OVER OVERLAY -->
+      <div id="gameOverOverlay" class="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-md hidden flex-col items-center justify-center p-6 text-center">
+        <div class="w-16 h-16 rounded-2xl bg-rose-500/10 border-2 border-rose-500/40 flex items-center justify-center mb-3 text-rose-500 text-2xl shadow-lg glow-red">
+          <i class="fa-solid fa-handcuffs"></i>
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-cyber font-black tracking-wide text-rose-500 mb-1">
+          ТРЕВОГА! ВЫ ПОЙМАНЫ
+        </h2>
+        <p class="text-xs text-slate-400 max-w-xs mb-4">
+          Охранник зафиксировал движение в охраняемом периметре.
+        </p>
+
+        <!-- Scores Breakdown -->
+        <div class="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-xl p-4 mb-5 space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400">Добыча за забег:</span>
+            <span id="finalScoreVal" class="font-cyber font-bold text-white text-sm">0</span>
+          </div>
+          <div class="flex justify-between items-center text-xs pt-2 border-t border-slate-800">
+            <span class="text-slate-400">Лучший рекорд:</span>
+            <span id="finalHighScoreVal" class="font-cyber font-bold text-amber-400 text-sm">0</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+          <button id="retryBtn" class="flex-1 py-2.5 px-5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-cyber font-bold text-xs tracking-wider transition-all border border-slate-700 active:scale-95">
+            <i class="fa-solid fa-rotate-right mr-1.5"></i> ПОВТОРИТЬ
+          </button>
+          <button id="reviveAdBtn" class="flex-1 py-2.5 px-4 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-cyber font-bold text-xs tracking-wide transition-all active:scale-95">
+            <i class="fa-solid fa-shield-halved mr-1"></i> ВОЗРОДИТЬСЯ
+          </button>
+        </div>
+      </div>
+
+      <!-- VICTORY OVERLAY -->
+      <div id="winOverlay" class="absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-md hidden flex-col items-center justify-center p-6 text-center">
+        <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 border-2 border-emerald-500/40 flex items-center justify-center mb-3 text-emerald-400 text-2xl shadow-lg">
+          <i class="fa-solid fa-box-open"></i>
+        </div>
+        <h2 class="text-2xl sm:text-3xl font-cyber font-black tracking-wide text-emerald-400 mb-1">
+          МИССИЯ ВЫПОЛНЕНА!
+        </h2>
+        <p class="text-xs text-slate-400 max-w-xs mb-4">
+          Вы успешно вынесли алмазы и ускользнули в вентиляционную шахту.
+        </p>
+
+        <div class="w-full max-w-xs bg-slate-900 border border-slate-800 rounded-xl p-4 mb-5 space-y-2">
+          <div class="flex justify-between items-center text-xs">
+            <span class="text-slate-400">Награда за уровень:</span>
+            <span id="winRewardVal" class="font-cyber font-bold text-cyan-400 text-sm">+1000</span>
+          </div>
+          <div class="flex justify-between items-center text-xs pt-2 border-t border-slate-800">
+            <span class="text-slate-400">Итоговый счет:</span>
+            <span id="winTotalScoreVal" class="font-cyber font-bold text-amber-400 text-sm">0</span>
+          </div>
+        </div>
+
+        <button id="nextZoneBtn" class="w-full max-w-xs py-3 px-6 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-cyber font-bold text-xs tracking-wider shadow-lg active:scale-95 transition-all">
+          СЛЕДУЮЩИЙ УРОВЕНЬ <i class="fa-solid fa-arrow-right ml-1"></i>
+        </button>
+      </div>
+
+      <!-- REWARDED AD SPONSOR SCREEN OVERLAY -->
+      <div id="adSponsorOverlay" class="absolute inset-0 z-40 bg-black/95 hidden flex-col items-center justify-center p-6 text-center">
+        <div class="relative w-20 h-20 mb-5 flex items-center justify-center">
+          <div class="absolute inset-0 rounded-full border-4 border-slate-800 border-t-amber-400 animate-spin"></div>
+          <i class="fa-solid fa-clapperboard text-2xl text-amber-400"></i>
+        </div>
+
+        <span class="px-2.5 py-1 rounded bg-amber-400/10 border border-amber-400/30 text-amber-300 text-[10px] font-mono font-bold tracking-widest uppercase mb-3">
+          Спонсорский ролик
+        </span>
+
+        <h3 class="text-xl sm:text-2xl font-cyber font-bold text-white mb-2">
+          ИДЕТ РЕКЛАМА СПОНСОРА...
+        </h3>
+        <p class="text-xs text-slate-400 max-w-xs mb-6">
+          «CyberVault Systems — лучшая квантовая сигнализация в Галактике»
+        </p>
+
+        <!-- Timer Circle -->
+        <div class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 border border-slate-800">
+          <i class="fa-solid fa-stopwatch text-amber-400 text-sm"></i>
+          <span class="text-xs text-slate-400">Награда через:</span>
+          <span id="adCountdownSeconds" class="font-mono font-bold text-amber-400 text-base">5</span>
+          <span class="text-xs text-slate-400">сек</span>
+        </div>
+
+        <p class="text-[10px] text-slate-600 mt-6">
+          Игра автоматически продолжится с получением бонуса.
+        </p>
+      </div>
+
+    </div>
+
+    
+    <!-- Mobile D-Pad Touch Interface -->
+    <div class="w-full flex items-center justify-between mt-3 px-2">
+      <!-- Active buffs mini banner -->
+      <div class="text-[11px] text-slate-400 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Статус: <strong id="playerStatusLabel" class="text-slate-200">В тени</strong></span>
+      </div>
+
+      <!-- Quick Reset Button -->
+      <button id="quickRestartBtn" class="text-[11px] text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-900/80 border border-slate-800 transition-colors">
+        <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Рестарт
+      </button>
+    </div>
+
+    <!-- Mobile Virtual Joypad (shown on touch devices) -->
+    <div id="mobileControls" class="sm:hidden grid grid-cols-3 gap-2 w-44 mx-auto my-2">
+      <div></div>
+      <button id="btnUp" class="h-11 bg-slate-800/90 active:bg-cyan-600 border border-slate-700 rounded-xl flex items-center justify-center text-slate-200 text-sm font-bold active:scale-95 transition-all">
+        <i class="fa-solid fa-arrow-up"></i>
+      </button>
+      <div></div>
+      <button id="btnLeft" class="h-11 bg-slate-800/90 active:bg-cyan-600 border border-slate-700 rounded-xl flex items-center justify-center text-slate-200 text-sm font-bold active:scale-95 transition-all">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+      <button id="btnDown" class="h-11 bg-slate-800/90 active:bg-cyan-600 border border-slate-700 rounded-xl flex items-center justify-center text-slate-200 text-sm font-bold active:scale-95 transition-all">
+        <i class="fa-solid fa-arrow-down"></i>
+      </button>
+      <button id="btnRight" class="h-11 bg-slate-800/90 active:bg-cyan-600 border border-slate-700 rounded-xl flex items-center justify-center text-slate-200 text-sm font-bold active:scale-95 transition-all">
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+    </div>
+
+  </main>
+
+  
+  <!-- PROMO CODE MODAL -->
+  <div id="promoModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl">
+      <button id="closePromoBtn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-sm">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-lg">
+          <i class="fa-solid fa-ticket"></i>
+        </div>
+        <div>
+          <h3 class="font-cyber font-bold text-white text-base">Активация промокода</h3>
+          <p class="text-xs text-slate-400">Введите подарочный купон или секрет</p>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <input type="text" id="promoInput" placeholder="Введи промокод (напр. SHADOW)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 text-white placeholder-slate-500 text-sm outline-none uppercase font-mono tracking-wider transition-colors">
+        </div>
+        <button id="submitPromoBtn" class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-cyber font-bold text-xs tracking-wider transition-colors">
+          АКТИВИРОВАТЬ
+        </button>
+        <p id="promoFeedback" class="text-center text-xs font-medium min-h-[18px]"></p>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-500">
+        Подсказка: попробуйте коды: <span class="text-cyan-400 font-mono">SHADOW</span>, <span class="text-cyan-400 font-mono">RICH</span> или <span class="text-cyan-400 font-mono">GHOST</span>.
+      </div>
+    </div>
+  </div>
+
+  <!-- HELP & CHEATS MODAL -->
+  <div id="helpModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="relative w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <button id="closeHelpBtn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-sm">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <h3 class="font-cyber font-bold text-white text-lg mb-3 flex items-center gap-2">
+        <i class="fa-solid fa-terminal text-cyan-400"></i> Руководство и Секреты
+      </h3>
+
+      <div class="space-y-4 text-xs text-slate-300 leading-relaxed">
+        <div>
+          <h4 class="font-bold text-cyan-400 uppercase tracking-wider mb-1">🎮 Как играть:</h4>
+          <ul class="list-disc list-inside space-y-1 text-slate-400">
+            <li>Двигайтесь на <b class="text-slate-200">WASD</b> или <b class="text-slate-200">Стрелках</b> клавиатуры.</li>
+            <li>Соберите алмазы (голубые камни), чтобы открыть замок выхода.</li>
+            <li>Доберитесь до зеленого люка эвакуации.</li>
+            <li><strong class="text-rose-400">Охранники с фонарями:</strong> попав в красный сектор луча, вы сразу выдадите себя! Лучи света разбиваются о стены лабиринта.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-amber-400 uppercase tracking-wider mb-1">📺 Бонусы за видео (Rewarded Ads):</h4>
+          <p class="text-slate-400">
+            Нажав кнопку <b class="text-amber-300">«Бонус-Видео»</b> в любой момент, вы включаете 5-секундный спонсорский экран. После просмотра выдается:
+          </p>
+          <div class="mt-1 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono text-[11px]">
+            +500 Монет и 5 секунд абсолютной невидимости («Стелс»)!
+          </div>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-purple-400 uppercase tracking-wider mb-1">🕹️ Чит-коды и Пасхалки:</h4>
+          <ul class="list-disc list-inside space-y-1 text-slate-400">
+            <li><b class="text-purple-300">Чит-код BOSS:</b> прямо во время игры наберите на клавиатуре буквы <span class="font-mono text-white bg-slate-800 px-1 rounded">B</span> <span class="font-mono text-white bg-slate-800 px-1 rounded">O</span> <span class="font-mono text-white bg-slate-800 px-1 rounded">S</span> <span class="font-mono text-white bg-slate-800 px-1 rounded">S</span> — персонаж превратится в титана с золотой аурой!</li>
+            <li><b class="text-purple-300">Секретный кликер:</b> кликните 5 раз подряд по заголовку <b class="text-white">«СТЕЛС-ВОРИШКА»</b> вверху экрана, чтобы переключить цветовую тему на неоновый градиент.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toastNotification" class="fixed bottom-6 z-50 px-4 py-2 rounded-xl bg-slate-900 border border-cyan-500/40 text-cyan-300 text-xs font-semibold shadow-xl transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2">
+    <i class="fa-solid fa-circle-check text-cyan-400"></i>
+    <span id="toastMsg">Бонус успешно получен!</span>
+  </div>
+
+  <script>
+    const STORAGE_KEY_SCORE = 'stealth_heist_arcade_highscore_v1';
+    
+    // Core game state
+    const STATE = {
+      MENU: 'MENU',
+      PLAYING: 'PLAYING',
+      PAUSED: 'PAUSED',
+      GAMEOVER: 'GAMEOVER',
+      WIN: 'WIN'
+    };
+
+    let currentGameState = STATE.MENU;
+    let isAdPlaying = false;
+    let score = 0;
+    let level = 1;
+    let neonThemeActive = false;
+
+    // Timers for buffs
+    let stealthTimer = 0;
+    let doublePointsTimer = 0;
+
+    // Canvas & rendering context
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const TILE = 40; // 20 columns * 15 rows = 800 x 600
+
+    // Sound effect synthesis using Web Audio API (No external sound files required)
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) this.ctx = new AudioContext();
+        }
+      },
+      playTone(freq, type = 'sine', duration = 0.15, vol = 0.1) {
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch(e) {}
+      },
+      playGem() {
+        this.playTone(880, 'sine', 0.12, 0.15);
+        setTimeout(() => this.playTone(1320, 'sine', 0.18, 0.12), 60);
+      },
+      playAlarm() {
+        this.playTone(220, 'sawtooth', 0.35, 0.25);
+        setTimeout(() => this.playTone(180, 'sawtooth', 0.45, 0.2), 100);
+      },
+      playWin() {
+        [523, 659, 784, 1046].forEach((f, i) => {
+          setTimeout(() => this.playTone(f, 'triangle', 0.25, 0.15), i * 110);
+        });
+      },
+      playBuff() {
+        this.playTone(440, 'triangle', 0.1, 0.2);
+        setTimeout(() => this.playTone(660, 'sine', 0.2, 0.2), 70);
+      }
+    };
+
+    const player = {
+      x: 60,
+      y: 60,
+      baseRadius: 11,
+      radius: 11,
+      speed: 175,
+      isBoss: false,
+      glowPulse: 0
+    };
+
+    // Keyboard state
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      AudioEngine.init();
+      trackCheatCode(e.key);
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    // Touch Controls setup
+    function setupTouchButton(btnId, keyCode) {
+      const el = document.getElementById(btnId);
+      if (!el) return;
+      const press = (ev) => { ev.preventDefault(); keys[keyCode] = true; AudioEngine.init(); };
+      const release = (ev) => { ev.preventDefault(); keys[keyCode] = false; };
+      el.addEventListener('touchstart', press);
+      el.addEventListener('touchend', release);
+      el.addEventListener('mousedown', press);
+      el.addEventListener('mouseup', release);
+      el.addEventListener('mouseleave', release);
+    }
+    setupTouchButton('btnUp', 'KeyW');
+    setupTouchButton('btnDown', 'KeyS');
+    setupTouchButton('btnLeft', 'KeyA');
+    setupTouchButton('btnRight', 'KeyD');
+
+    // Easter Egg #1: Type BOSS to enlarge player
+    let cheatBuffer = [];
+    const SECRET_KEYWORD = 'boss';
+    function trackCheatCode(key) {
+      cheatBuffer.push(key.toLowerCase());
+      if (cheatBuffer.length > 10) cheatBuffer.shift();
+      if (cheatBuffer.join('').includes(SECRET_KEYWORD)) {
+        cheatBuffer = [];
+        toggleBossMode();
+      }
+    }
+
+    function toggleBossMode() {
+      player.isBoss = !player.isBoss;
+      player.radius = player.isBoss ? 22 : player.baseRadius;
+      showToast(player.isBoss ? '👑 ЧИТ-КОД BOSS АКТИВИРОВАН! (Гигант)' : 'Режим BOSS выключен');
+      AudioEngine.playBuff();
+    }
+
+    // Easter Egg #2: Click title 5 times for dynamic neon theme
+    let titleClickCount = 0;
+    let titleClickTimeout = null;
+    document.getElementById('gameHeaderTitle').addEventListener('click', () => {
+      titleClickCount++;
+      clearTimeout(titleClickTimeout);
+      titleClickTimeout = setTimeout(() => { titleClickCount = 0; }, 1500);
+
+      if (titleClickCount >= 5) {
+        neonThemeActive = !neonThemeActive;
+        titleClickCount = 0;
+        showToast(neonThemeActive ? '🌈 Неоновый градиент включен!' : 'Стандартная палитра восстановлена');
+        AudioEngine.playBuff();
+      }
+    });
+
+    // 20x15 Map Matrix
+    // 0: Floor, 1: Wall, 2: Player Spawn, 3: Exit Hatch
+    const mapLayout = [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,2,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,3,1],
+      [1,0,1,1,0,1,0,1,1,1,1,0,1,0,1,1,1,1,0,1],
+      [1,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,1,0,1],
+      [1,0,1,0,1,1,0,1,0,1,1,1,1,0,1,0,0,0,0,1],
+      [1,0,0,0,1,0,0,0,0,0,0,0,1,0,1,1,1,1,0,1],
+      [1,1,1,0,1,0,1,1,1,0,1,0,1,0,0,0,0,1,0,1],
+      [1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,1,0,1,0,1],
+      [1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,0,0,0,0,1],
+      [1,0,1,0,0,0,0,0,1,0,0,0,1,0,1,0,1,1,0,1],
+      [1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,0,1,0,0,1],
+      [1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,1],
+      [1,0,1,1,1,0,1,1,1,0,1,1,1,1,1,0,1,1,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ];
+
+    let gems = [];
+    let particles = [];
+    let guards = [];
+
+    function spawnGems() {
+      gems = [
+        { x: 4 * TILE + 20, y: 3 * TILE + 20, collected: false },
+        { x: 8 * TILE + 20, y: 1 * TILE + 20, collected: false },
+        { x: 14 * TILE + 20, y: 1 * TILE + 20, collected: false },
+        { x: 9 * TILE + 20, y: 5 * TILE + 20, collected: false },
+        { x: 3 * TILE + 20, y: 7 * TILE + 20, collected: false },
+        { x: 12 * TILE + 20, y: 7 * TILE + 20, collected: false },
+        { x: 17 * TILE + 20, y: 7 * TILE + 20, collected: false },
+        { x: 7 * TILE + 20, y: 11 * TILE + 20, collected: false },
+        { x: 13 * TILE + 20, y: 11 * TILE + 20, collected: false },
+        { x: 9 * TILE + 20, y: 13 * TILE + 20, collected: false }
+      ];
+    }
+
+    function spawnGuards() {
+      guards = [
+        {
+          x: 260, y: 180,
+          angle: 0,
+          viewDist: 180,
+          viewAngle: Math.PI / 3, // 60 deg
+          speed: 70,
+          waypoints: [
+            { x: 260, y: 180 },
+            { x: 500, y: 180 }
+          ],
+          currentWp: 0,
+          waitTime: 0
+        },
+        {
+          x: 620, y: 380,
+          angle: Math.PI,
+          viewDist: 170,
+          viewAngle: Math.PI / 3.2,
+          speed: 80,
+          waypoints: [
+            { x: 620, y: 380 },
+            { x: 620, y: 500 },
+            { x: 360, y: 500 }
+          ],
+          currentWp: 0,
+          waitTime: 0
+        },
+        {
+          x: 100, y: 480,
+          angle: -Math.PI / 2,
+          viewDist: 160,
+          viewAngle: Math.PI / 3,
+          speed: 65,
+          waypoints: [
+            { x: 100, y: 480 },
+            { x: 100, y: 280 }
+          ],
+          currentWp: 0,
+          waitTime: 0
+        }
+      ];
+    }
+
+    function getStoredHighScore() {
+      return parseInt(localStorage.getItem(STORAGE_KEY_SCORE) || '0', 10);
+    }
+
+    function checkAndUpdateHighScore(val) {
+      const current = getStoredHighScore();
+      if (val > current) {
+        localStorage.setItem(STORAGE_KEY_SCORE, val.toString());
+        syncScoreUI();
+        return val;
+      }
+      return current;
+    }
+
+    function syncScoreUI() {
+      const best = getStoredHighScore();
+      document.getElementById('hudHighScore').textContent = best;
+      document.getElementById('menuHighScoreVal').textContent = best;
+      document.getElementById('hudScore').textContent = score;
+    }
+
+    function showToast(text) {
+      const toast = document.getElementById('toastNotification');
+      document.getElementById('toastMsg').textContent = text;
+      toast.classList.remove('translate-y-24', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-24', 'opacity-0');
+      }, 2600);
+    }
+
+    function isTileBlocked(tileX, tileY) {
+      if (tileX < 0 || tileX >= 20 || tileY < 0 || tileY >= 15) return true;
+      return mapLayout[tileY][tileX] === 1;
+    }
+
+    function isPointInWall(px, py) {
+      const tx = Math.floor(px / TILE);
+      const ty = Math.floor(py / TILE);
+      return isTileBlocked(tx, ty);
+    }
+
+    function testCircleWall(cx, cy, radius) {
+      // Sample 8 cardinal and diagonal border points
+      for (let i = 0; i < 8; i++) {
+        const rad = (i * Math.PI) / 4;
+        const testX = cx + Math.cos(rad) * radius;
+        const testY = cy + Math.sin(rad) * radius;
+        if (isPointInWall(testX, testY)) return true;
+      }
+      return false;
+    }
+
+    // Raycast through tiles to test line-of-sight obstruction
+    function hasClearLineOfSight(x0, y0, x1, y1) {
+      const dist = Math.hypot(x1 - x0, y1 - y0);
+      const steps = Math.ceil(dist / 6);
+      for (let i = 1; i < steps; i++) {
+        const factor = i / steps;
+        const sampleX = x0 + (x1 - x0) * factor;
+        const sampleY = y0 + (y1 - y0) * factor;
+        if (isPointInWall(sampleX, sampleY)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    function updatePhysics(dt) {
+      if (currentGameState !== STATE.PLAYING || isAdPlaying) return;
+
+      // 1. Process Player Movement
+      let moveX = 0;
+      let moveY = 0;
+
+      if (keys['KeyW'] || keys['ArrowUp']) moveY -= 1;
+      if (keys['KeyS'] || keys['ArrowDown']) moveY += 1;
+      if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+      if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+
+      if (moveX !== 0 && moveY !== 0) {
+        moveX *= 0.7071;
+        moveY *= 0.7071;
+      }
+
+      const step = player.speed * dt;
+      const targetX = player.x + moveX * step;
+      const targetY = player.y + moveY * step;
+
+      // Wall-sliding on X and Y independently
+      if (!testCircleWall(targetX, player.y, player.radius)) {
+        player.x = targetX;
+      }
+      if (!testCircleWall(player.x, targetY, player.radius)) {
+        player.y = targetY;
+      }
+
+      // 2. Manage Buff Timers
+      if (stealthTimer > 0) {
+        stealthTimer -= dt;
+        if (stealthTimer <= 0) {
+          stealthTimer = 0;
+          document.getElementById('stealthBuffBadge').classList.add('hidden');
+          document.getElementById('playerStatusLabel').textContent = 'В тени';
+        } else {
+          document.getElementById('stealthBuffBadge').classList.remove('hidden');
+          document.getElementById('stealthTimerText').textContent = `${stealthTimer.toFixed(1)}s`;
+          document.getElementById('playerStatusLabel').textContent = 'Стелс-маскировка';
+        }
+      }
+
+      if (doublePointsTimer > 0) {
+        doublePointsTimer -= dt;
+        if (doublePointsTimer <= 0) {
+          doublePointsTimer = 0;
+          document.getElementById('doubleBuffBadge').classList.add('hidden');
+        } else {
+          document.getElementById('doubleBuffBadge').classList.remove('hidden');
+          document.getElementById('doubleTimerText').textContent = `${doublePointsTimer.toFixed(1)}s`;
+        }
+      }
+
+      // 3. Update Guards and Vision Cones
+      for (const guard of guards) {
+        if (guard.waitTime > 0) {
+          guard.waitTime -= dt;
+          continue;
+        }
+
+        const targetWp = guard.waypoints[guard.currentWp];
+        const dist = Math.hypot(targetWp.x - guard.x, targetWp.y - guard.y);
+
+        if (dist < 5) {
+          guard.currentWp = (guard.currentWp + 1) % guard.waypoints.length;
+          guard.waitTime = 0.5; // Short pause before turn
+        } else {
+          const moveAngle = Math.atan2(targetWp.y - guard.y, targetWp.x - guard.x);
+          guard.angle = moveAngle;
+          guard.x += Math.cos(moveAngle) * guard.speed * dt;
+          guard.y += Math.sin(moveAngle) * guard.speed * dt;
+        }
+
+        // Check detection if player isn't stealth-invisible
+        if (stealthTimer <= 0) {
+          const distToPlayer = Math.hypot(player.x - guard.x, player.y - guard.y);
+          if (distToPlayer <= guard.viewDist) {
+            const angleToPlayer = Math.atan2(player.y - guard.y, player.x - guard.x);
+            let angleDiff = Math.abs(guard.angle - angleToPlayer);
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            angleDiff = Math.abs(angleDiff);
+
+            if (angleDiff <= guard.viewAngle / 2) {
+              if (hasClearLineOfSight(guard.x, guard.y, player.x, player.y)) {
+                handleBusted();
+                return;
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Collect Gems
+      let remainingCount = 0;
+      for (const gem of gems) {
+        if (!gem.collected) {
+          remainingCount++;
+          const d = Math.hypot(player.x - gem.x, player.y - gem.y);
+          if (d < player.radius + 12) {
+            gem.collected = true;
+            const pointsAward = (doublePointsTimer > 0) ? 200 : 100;
+            score += pointsAward;
+            spawnSparkles(gem.x, gem.y, '#38bdf8');
+            AudioEngine.playGem();
+            syncScoreUI();
+          }
+        }
+      }
+      document.getElementById('hudGemsRatio').textContent = `${gems.filter(g => g.collected).length} / ${gems.length}`;
+
+      // 5. Check Escape Hatch
+      const currentTileX = Math.floor(player.x / TILE);
+      const currentTileY = Math.floor(player.y / TILE);
+      if (mapLayout[currentTileY] && mapLayout[currentTileY][currentTileX] === 3) {
+        handleLevelVictory();
+      }
+
+      // 6. Update visual particles
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function spawnSparkles(x, y, color) {
+      for (let i = 0; i < 14; i++) {
+        const rad = Math.random() * Math.PI * 2;
+        const spd = 20 + Math.random() * 80;
+        particles.push({
+          x, y,
+          vx: Math.cos(rad) * spd * 0.016,
+          vy: Math.sin(rad) * spd * 0.016,
+          color,
+          radius: 1.5 + Math.random() * 2,
+          life: 0.4 + Math.random() * 0.4
+        });
+      }
+    }
+
+    function handleBusted() {
+      currentGameState = STATE.GAMEOVER;
+      AudioEngine.playAlarm();
+      const best = checkAndUpdateHighScore(score);
+      document.getElementById('finalScoreVal').textContent = score;
+      document.getElementById('finalHighScoreVal').textContent = best;
+      document.getElementById('gameOverOverlay').classList.remove('hidden');
+      document.getElementById('gameOverOverlay').classList.add('flex');
+    }
+
+    function handleLevelVictory() {
+      currentGameState = STATE.WIN;
+      AudioEngine.playWin();
+      score += 1000;
+      const best = checkAndUpdateHighScore(score);
+      document.getElementById('winTotalScoreVal').textContent = score;
+      document.getElementById('winOverlay').classList.remove('hidden');
+      document.getElementById('winOverlay').classList.add('flex');
+    }
+
+    function startNewGame() {
+      score = 0;
+      stealthTimer = 0;
+      doublePointsTimer = 0;
+      player.x = 60;
+      player.y = 60;
+      player.isBoss = false;
+      player.radius = player.baseRadius;
+
+      spawnGems();
+      spawnGuards();
+      syncScoreUI();
+
+      // Hide all overlays
+      document.getElementById('startOverlay').classList.add('hidden');
+      document.getElementById('gameOverOverlay').classList.add('hidden');
+      document.getElementById('gameOverOverlay').classList.remove('flex');
+      document.getElementById('winOverlay').classList.add('hidden');
+      document.getElementById('winOverlay').classList.remove('flex');
+      document.getElementById('stealthBuffBadge').classList.add('hidden');
+      document.getElementById('doubleBuffBadge').classList.add('hidden');
+
+      currentGameState = STATE.PLAYING;
+    }
+
+    function advanceToNextLevel() {
+      level++;
+      document.getElementById('hudLevelNum').textContent = level;
+      player.x = 60;
+      player.y = 60;
+      spawnGems();
+      spawnGuards();
+      // Increase guard speed slightly for challenge
+      guards.forEach(g => g.speed += 8);
+      document.getElementById('winOverlay').classList.add('hidden');
+      document.getElementById('winOverlay').classList.remove('flex');
+      currentGameState = STATE.PLAYING;
+    }
+
+    const adOverlay = document.getElementById('adSponsorOverlay');
+    const adSecondsSpan = document.getElementById('adCountdownSeconds');
+    let adInterval = null;
+
+    function triggerRewardedAd(onCompletedCallback) {
+      if (isAdPlaying) return;
+      isAdPlaying = true;
+      adOverlay.classList.remove('hidden');
+      adOverlay.classList.add('flex');
+
+      let remaining = 5;
+      adSecondsSpan.textContent = remaining;
+
+      clearInterval(adInterval);
+      adInterval = setInterval(() => {
+        remaining--;
+        adSecondsSpan.textContent = remaining;
+        if (remaining <= 0) {
+          clearInterval(adInterval);
+          adOverlay.classList.add('hidden');
+          adOverlay.classList.remove('flex');
+          isAdPlaying = false;
+          
+          if (onCompletedCallback) {
+            onCompletedCallback();
+          } else {
+            // Default reward: +500 points & 5s stealth shield
+            score += 500;
+            stealthTimer = 5;
+            syncScoreUI();
+            showToast('🎁 Награда получена: +500 очков и 5 сек Стелса!');
+            AudioEngine.playBuff();
+          }
+        }
+      }, 1000);
+    }
+
+    // Header Ad Button
+    document.getElementById('headerAdBtn').addEventListener('click', () => {
+      AudioEngine.init();
+      triggerRewardedAd();
+    });
+
+    // Start Screen Ad Button
+    document.getElementById('menuAdRewardBtn').addEventListener('click', () => {
+      AudioEngine.init();
+      triggerRewardedAd(() => {
+        score += 500;
+        stealthTimer = 5;
+        syncScoreUI();
+        startNewGame();
+        showToast('🎁 Старт с бонусом: +500 очков и маскировка!');
+      });
+    });
+
+    // Game Over Revive Button
+    document.getElementById('reviveAdBtn').addEventListener('click', () => {
+      AudioEngine.init();
+      triggerRewardedAd(() => {
+        // Revive right at spawn with 6s stealth immunity
+        player.x = 60;
+        player.y = 60;
+        stealthTimer = 6;
+        document.getElementById('gameOverOverlay').classList.add('hidden');
+        document.getElementById('gameOverOverlay').classList.remove('flex');
+        currentGameState = STATE.PLAYING;
+        showToast('🛡️ Возрождение! Стелс активирован на 6 сек.');
+      });
+    });
+
+    const promoModal = document.getElementById('promoModal');
+    const promoInput = document.getElementById('promoInput');
+    const promoFeedback = document.getElementById('promoFeedback');
+
+    document.getElementById('promoModalBtn').addEventListener('click', () => {
+      promoModal.classList.remove('hidden');
+      promoModal.classList.add('flex');
+      promoInput.value = '';
+      promoFeedback.textContent = '';
+    });
+    document.getElementById('closePromoBtn').addEventListener('click', () => {
+      promoModal.classList.add('hidden');
+      promoModal.classList.remove('flex');
+    });
+
+    document.getElementById('submitPromoBtn').addEventListener('click', () => {
+      const code = promoInput.value.trim().toUpperCase();
+      AudioEngine.init();
+
+      if (code === 'SHADOW') {
+        stealthTimer += 10;
+        promoFeedback.className = 'text-center text-xs font-semibold text-cyan-400';
+        promoFeedback.textContent = 'Успешно! +10 сек невидимости!';
+        AudioEngine.playBuff();
+      } else if (code === 'RICH') {
+        score += 1000;
+        syncScoreUI();
+        promoFeedback.className = 'text-center text-xs font-semibold text-amber-400';
+        promoFeedback.textContent = 'Успешно! +1000 золотых очков!';
+        AudioEngine.playBuff();
+      } else if (code === 'GHOST') {
+        doublePointsTimer += 15;
+        promoFeedback.className = 'text-center text-xs font-semibold text-purple-400';
+        promoFeedback.textContent = 'Успешно! Удвоение очков (2X) на 15 сек!';
+        AudioEngine.playBuff();
+      } else {
+        promoFeedback.className = 'text-center text-xs font-semibold text-rose-400';
+        promoFeedback.textContent = 'Неверный промокод или срок действия истек.';
+      }
+    });
+
+    // Help Modal Triggers
+    const helpModal = document.getElementById('helpModal');
+    document.getElementById('helpBtn').addEventListener('click', () => {
+      helpModal.classList.remove('hidden');
+      helpModal.classList.add('flex');
+    });
+    document.getElementById('closeHelpBtn').addEventListener('click', () => {
+      helpModal.classList.add('hidden');
+      helpModal.classList.remove('flex');
+    });
+
+    function renderConeOfVision(guard) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(guard.x, guard.y);
+
+      const rayCount = 28;
+      const halfFov = guard.viewAngle / 2;
+
+      for (let i = 0; i <= rayCount; i++) {
+        const curAngle = (guard.angle - halfFov) + (guard.viewAngle * (i / rayCount));
+        let maxDist = guard.viewDist;
+
+        // Truncate ray at wall boundaries
+        for (let d = 10; d <= guard.viewDist; d += 8) {
+          const testX = guard.x + Math.cos(curAngle) * d;
+          const testY = guard.y + Math.sin(curAngle) * d;
+          if (isPointInWall(testX, testY)) {
+            maxDist = d;
+            break;
+          }
+        }
+
+        const endpointX = guard.x + Math.cos(curAngle) * maxDist;
+        const endpointY = guard.y + Math.sin(curAngle) * maxDist;
+        ctx.lineTo(endpointX, endpointY);
+      }
+
+      ctx.closePath();
+      const radialGrad = ctx.createRadialGradient(guard.x, guard.y, 8, guard.x, guard.y, guard.viewDist);
+      radialGrad.addColorStop(0, 'rgba(239, 68, 68, 0.65)');
+      radialGrad.addColorStop(0.7, 'rgba(239, 68, 68, 0.25)');
+      radialGrad.addColorStop(1, 'rgba(239, 68, 68, 0.02)');
+      
+      ctx.fillStyle = radialGrad;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function renderWorld() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 1. Draw Maze Floor and Walls
+      for (let row = 0; row < 15; row++) {
+        for (let col = 0; col < 20; col++) {
+          const tile = mapLayout[row][col];
+          const x = col * TILE;
+          const y = row * TILE;
+
+          if (tile === 1) {
+            // Wall Tile
+            ctx.fillStyle = neonThemeActive ? '#1e1b4b' : '#1e293b';
+            ctx.fillRect(x, y, TILE, TILE);
+            ctx.strokeStyle = neonThemeActive ? '#6366f1' : '#0f172a';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, TILE, TILE);
+            
+            // Wall Inner Bevel
+            ctx.strokeStyle = neonThemeActive ? '#4338ca' : '#334155';
+            ctx.strokeRect(x + 2, y + 2, TILE - 4, TILE - 4);
+          } else {
+            // Floor Tile
+            ctx.fillStyle = neonThemeActive ? '#090d16' : '#0d111a';
+            ctx.fillRect(x, y, TILE, TILE);
+            // Subtle floor grid dots
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(x + TILE - 2, y + TILE - 2, 1.5, 1.5);
+          }
+
+          if (tile === 3) {
+            // Exit Hatch (Vent)
+            ctx.save();
+            ctx.fillStyle = '#065f46';
+            ctx.fillRect(x + 4, y + 4, TILE - 8, TILE - 8);
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 4, y + 4, TILE - 8, TILE - 8);
+            // Vent Grill slats
+            ctx.strokeStyle = '#34d399';
+            ctx.beginPath();
+            ctx.moveTo(x + 8, y + 12); ctx.lineTo(x + TILE - 8, y + 12);
+            ctx.moveTo(x + 8, y + 20); ctx.lineTo(x + TILE - 8, y + 20);
+            ctx.moveTo(x + 8, y + 28); ctx.lineTo(x + TILE - 8, y + 28);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }
+
+      // 2. Draw Gems
+      const timeNow = performance.now() * 0.003;
+      for (const gem of gems) {
+        if (!gem.collected) {
+          ctx.save();
+          const bob = Math.sin(timeNow + gem.x) * 2;
+          ctx.translate(gem.x, gem.y + bob);
+
+          // Diamond Shape
+          ctx.beginPath();
+          ctx.moveTo(0, -9);
+          ctx.lineTo(8, 0);
+          ctx.lineTo(0, 9);
+          ctx.lineTo(-8, 0);
+          ctx.closePath();
+
+          ctx.fillStyle = '#38bdf8';
+          ctx.shadowColor = '#38bdf8';
+          ctx.shadowBlur = 8;
+          ctx.fill();
+
+          ctx.strokeStyle = '#e0f2fe';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // 3. Draw Guards & Flashlights
+      for (const guard of guards) {
+        renderConeOfVision(guard);
+
+        // Guard Body
+        ctx.save();
+        ctx.translate(guard.x, guard.y);
+        ctx.rotate(guard.angle);
+
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath();
+        ctx.arc(0, 0, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#f87171';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Flashlight holder
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(4, -3, 8, 6);
+        ctx.restore();
+      }
+
+      // 4. Draw Particles
+      for (const p of particles) {
+        ctx.save();
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 5. Draw Player Character
+      ctx.save();
+      ctx.translate(player.x, player.y);
+
+      // Stealth cloak / shield glow
+      if (stealthTimer > 0) {
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius + 6, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(6, 182, 212, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.globalAlpha = 0.55;
+      }
+
+      // Boss Mode Gold Aura
+      if (player.isBoss) {
+        ctx.shadowColor = '#f59e0b';
+        ctx.shadowBlur = 15;
+      }
+
+      // Body Circle
+      ctx.fillStyle = player.isBoss ? '#f59e0b' : (neonThemeActive ? '#ec4899' : '#0ea5e9');
+      ctx.beginPath();
+      ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Bandit Visor / Mask Line
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-player.radius * 0.7, -3, player.radius * 1.4, 6);
+
+      ctx.restore();
+    }
+
+    let lastTimestamp = performance.now();
+
+    function gameLoop(currentTimestamp) {
+      const dt = Math.min((currentTimestamp - lastTimestamp) / 1000, 0.1);
+      lastTimestamp = currentTimestamp;
+
+      updatePhysics(dt);
+      renderWorld();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Attach Action Buttons
+    document.getElementById('startGameBtn').addEventListener('click', () => {
+      AudioEngine.init();
+      startNewGame();
+    });
+
+    document.getElementById('retryBtn').addEventListener('click', () => {
+      AudioEngine.init();
+      startNewGame();
+    });
+
+    document.getElementById('nextZoneBtn').addEventListener('click', () => {
+      AudioEngine.init();
+      advanceToNextLevel();
+    });
+
+    document.getElementById('quickRestartBtn').addEventListener('click', () => {
+      AudioEngine.init();
+      startNewGame();
+    });
+
+    // Initial state setup
+    syncScoreUI();
+    spawnGems();
+    spawnGuards();
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
